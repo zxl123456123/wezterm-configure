@@ -40,7 +40,9 @@ git clone https://github.com/zxl123456123/wezterm-configure.git D:\MyGit1\wezter
 
 所有路径均相对于 `D:\terminal-workbench`。Windows 原生 Zellij 是兼容前提：此仓库未附带或确认其二进制供应来源，不能假设任意 Zellij 上游/WSL 安装都能直接启动 Windows KDL 里的命令。需要兼容 `list-tabs --state/--json`、`list-panes --all --json`、`new-pane --in-place` 等 CLI。
 
-另外安装 Git for Windows，并确认 `C:\Program Files\Git\usr\bin\file.exe` 存在；启用 Windows OpenSSH 客户端。PowerShell 5.1 为当前本地 Shell。fzf、zoxide、fastfetch 的目录在启动 PATH 中预留，但当前脚本没有自动初始化它们，属于可选工具。
+另外安装 Git for Windows，并确认 `C:\Program Files\Git\usr\bin\file.exe` 存在；启用 Windows OpenSSH 客户端。PowerShell 5.1 + PSReadLine 2.0.0 为当前本地 Shell，不需要升级 PowerShell 7。
+
+可选增强：从官方发行页准备 `apps\fzf\fzf.exe`（本机实读 0.74.4）和 `apps\zoxide\zoxide.exe`（本机实读 0.10.0）。新 Work-Windows Shell 自动启用 F2 历史搜索与 z/zi 目录跳转，数据保存在 `data\zoxide`；缺少工具时仍保留基础 Shell、Tab 补全和配色。没有自动下载器；fastfetch 仍只是可选工具。使用方式见 [USAGE](USAGE.md)。
 
 上游链接见 [UPSTREAM](UPSTREAM.md)。YASB 的上游安装方式见[官方安装文档](https://github.com/amnweb/yasb/wiki/Installation)；如果安装到系统目录，请调整本仓库路径，不要为了路径匹配随意复制系统运行库。
 

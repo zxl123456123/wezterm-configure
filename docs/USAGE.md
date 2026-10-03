@@ -24,6 +24,24 @@
 
 Windows Work 中输入语法配色由 PSReadLine 提供；已经执行完的任意程序输出不会因此自动获得语法高亮。`ai` 只是按需调用已安装的 `codex` 命令，不是常驻 AI，也没有后台自动补全服务。
 
+本地 PowerShell 5.1 的开发增强（不改变 Linux 远端 Shell）：
+
+| 操作 | 用法 |
+| --- | --- |
+| 命令 / 参数 / 路径补全 | 输入一部分后按 `Tab`；多项时用方向键选，Enter 确认补全 |
+| 按前缀找历史 | 例如先输入 `git`，再按 `↑` / `↓`；空输入时浏览历史 |
+| 模糊搜索历史 | `F2` 打开，输入关键字；Enter 只填入命令，再按 Enter 才执行；Esc 取消 |
+| 常用目录跳转 | 先正常 `cd` 到目录，提示符出现后学习；以后 `z 关键词`，例如 `z myproject` |
+| 挑选目录 | `zi` 或 `zi 关键词`；没有学习过的目录不在列表中 |
+
+F2 只搜索 PSReadLine 已加载的单行历史，不把多行脚本拆成可执行碎片。不要把密码写在命令参数里，历史搜索没有替你脱敏。z/zi 需要可选工具，数据库在 `D:\terminal-workbench\data\zoxide`；不替代原有 cwd 恢复。命令蓝、参数紫、字符串绿、变量粉、错误红，选区使用深色背景与浅色文字。
+
+仅下次自然新开 Work-Windows Shell 才加载更新，重连旧 Zellij 不会刷新现有 Shell。想现在试用时，可在 Work-Windows 用 `Alt+N` 新增面板，再执行下面命令；保留旧面板及任务，不必重启整个窗口：
+
+```powershell
+powershell.exe -NoLogo -NoProfile -NoExit -ExecutionPolicy Bypass -File D:\terminal-workbench\Start-WorkShell.ps1
+```
+
 远程 Claude Code 等终端程序可能把 `Ctrl+V` 当图片粘贴操作；粘贴文本优先用终端的 `Ctrl+Shift+V`。终端里 `Ctrl+C` 常常是中断进程，不要把它当作通用复制键；选中文本后使用 WezTerm 的 `Ctrl+Shift+C`。不同嵌套程序的鼠标捕获/选择模式会影响是否能直接拖选。
 
 SSH 不会自动把本机图片剪贴板传到远端。需要图片时手动 `scp` 上传，并在远端使用文件路径，不能把“没有剪贴板图片”当作文字复制失败。

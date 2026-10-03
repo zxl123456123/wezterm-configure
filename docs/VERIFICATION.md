@@ -2,6 +2,24 @@
 
 本页保留 2026-10-03 首次安全配置快照的验证，以及后续增量实施证据。首次快照验证阶段只在仓库和隔离夹具中验证，当时未替换运行目录或重新启动使用中的会话；后续受控交付由各阶段承接记录说明，不把阶段测试结果解释为当前实例已加载。
 
+## 本地 Shell 增强（2026-10-03）
+
+在 Windows PowerShell 5.1.26100.9444 + PSReadLine 2.0.0 上执行 `tests/test_work_shell.ps1`：30 个断言，exit 0。覆盖键位与 RGB 选区、单行提示符、退出码保留、不重复写入、中文/空格目录恢复、真实 zoxide/zi 与 fzf、选中只插入、取消保留输入、过滤多行历史、工具缺失时基础 Shell 可用。历史编辑器状态使用合成适配器；实际 fzf/zoxide 使用独立 D 盘数据，没有读取用户历史或真实目录数据库。
+
+原有启动器测试完整重跑：6 项、0 失败、exit 0（8.709s）；模拟的子命令失败/超时仍被正确报告，不启动真实窗口。未重跑与本次未改动的 Control/Spectrum 有关的完整套件。
+
+原版 Shell 在同一测试上预期 exit 1，失败于 Tab 未绑定 MenuComplete。另开独立 PTY，实测 Tab 补全、RGB ANSI 输出、F2 原生选择只填入未执行、取消恢复原输入；只操作测试终端，不操作现有 WezTerm/Zellij。该 PTY 不代表嵌套 Zellij、鼠标或全部键位已做视觉验收。
+
+保留失败：测试夹具首轮因带连字符的函数变量访问语法 exit 1；随后严格错误模式将预期的 zoxide 无匹配提示当异常，已改为断言明确拒绝。中文 F2 首测 exit 1，定位为 PowerShell 5.1 的函数局部管道编码无效；改为搜索期间临时全局 UTF-8 并恢复后全量 exit 0。PTY 夹具曾在编辑器初始化前调用 AddToHistory 导致空引用，之后改用隔离历史入口；一次按键取消/退出连发被拼成无效测试命令，分开事件验证后正常退出。首个保护清单检查误用字段产生非终止错误，未采用其 exit 0；改用真实字段与严格错误模式后核对 50 文件一致。首次长启动测试输出截断，仅保留作过程记录，完整重跑才作为证据。
+
+可复跑入口（D 盘仓库、已准备可选 fzf/zoxide）：
+
+```powershell
+C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File tests\test_work_shell.ps1
+```
+
+本轮不升级 Shell，不增加 AI 预测，不改布局/远端/Music/Control。新源码需下一自然新 Shell 才加载；没有测量整机 CPU 降幅或宣称当前面板已更新。
+
 ## 首次快照阶段实际执行
 
 | 检查 | 结果 | 边界 |

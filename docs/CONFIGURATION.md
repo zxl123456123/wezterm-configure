@@ -43,6 +43,14 @@
 
 文件不存在或保存目录已删除时回退默认目录。当前路径文件属于运行状态，不提交 Git。原远程 IP 和个人项目路径已换为 SSH 别名/样例，运行目录中的真实连接未被修改。
 
+## 本地 Shell 增强
+
+入口：`Start-WorkShell.ps1`。保持 PowerShell 5.1 + PSReadLine 2.0.0、简洁 WIN 提示符与按目录变化保存 cwd；不改全局 profile，不升级模块，也不增加常驻 AI 或动画。
+
+采用 [PSReadLine 原生键位](https://learn.microsoft.com/en-us/powershell/module/psreadline/set-psreadlinekeyhandler)：Tab 菜单补全、上下键前缀历史，配色使用 Macchiato RGB 与清晰选区。F2 复用 [fzf](https://github.com/junegunn/fzf) 按需搜索，遵循 [PSFzf 的编辑器集成方式](https://github.com/kelleyma49/PSFzf)，但不安装额外模块：退出原生 UI 后只重绘一次，选择只插入而不执行。
+
+[zoxide](https://github.com/ajeetdsouza/zoxide) 使用官方 `--hook none` 初始化 z/zi，学习目录放在已有 prompt 的目录变化分支中；避免第二层提示符包装，并保留上一条程序的退出码。`_ZO_DATA_DIR` 固定在 D 盘运行数据目录；fzf 的 PATH 只在当前 Shell 进程中补齐。Shell 高亮不是任意程序输出高亮，也不是 AI 行内预测；这些边界与 PSReadLine 2.4 在旧宿主中的渲染兼容性有关。
+
 ## Monitor
 
 入口：`config/bottom/readable.toml`。刷新 `1s`，60 秒历史；CPU 30%、磁盘/内存 28%、网络 17%、进程 25% 布局比例。CPU 默认平均曲线，保留小数；进程默认按 CPU 排序，显示滚动位置和滚动条。

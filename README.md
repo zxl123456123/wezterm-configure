@@ -8,7 +8,7 @@ Windows 开发终端工作台的配置、启动脚本和自写控件源码。主
 
 | Zellij 标签 | 内容与使用方式 |
 | --- | --- |
-| Work-Windows | 左侧 Yazi 文件管理，右侧 PowerShell；输入语法配色，记录两者上次目录 |
+| Work-Windows | 左侧 Yazi，右侧 PowerShell；真彩输入高亮、Tab 补全、F2 历史搜索、z/zi 跳转，记忆目录 |
 | Work-for-Linux | SSH 三面板：Main / Dev / Files；远端分别记录当前目录；公开配置使用 `workbench-linux` 别名 |
 | Monitor | bottom 的 CPU 曲线、磁盘、内存、网络和进程表；1 秒采样；表格可聚焦滚动 |
 | Music | CNMPlayer 播放和歌词，上部 82% 播放器、下部局部彩色频谱与深度环绕效果 |
@@ -71,7 +71,7 @@ Music 被关掉或 Player 已退出时，使用根目录 `Restore-Music.cmd`。�
 │   └── spectrum/              自写频谱 / 测试
 ├── remote/                    SSH 别名样例、远端每面板 cwd 记录
 ├── patches/cnmplayer/         基于固定上游提交的修改补丁与原许可
-├── tests/                     隔离启动器测试，不运行真实启动器
+├── tests/                     隔离启动器与 Shell 测试，不操作真实会话
 ├── docs/                      安装、使用、配置和验证边界
 ├── images/                    仅说明；图片由使用者提供
 └── fonts/                     仅说明；字体由使用者提供
