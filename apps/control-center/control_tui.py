@@ -68,10 +68,11 @@ class Control(App):
     #toolbar { height: 4; padding: 0 2; background: #24273a; }
     #title { width: 1fr; height: 3; content-align: left middle;
              color: #c6a0f6; text-style: bold; }
+    #image-controls { width: 46; height: 3; }
     #image-label { width: 7; height: 3; content-align: right middle;
                    color: #8bd5ca; text-style: bold; }
     #image { width: 38; margin: 0 0 0 1; }
-    #overview { height: 3; margin: 1 2; padding: 0 2;
+    #overview { height: auto; min-height: 3; margin: 1 2; padding: 0 2;
                 background: #363a4f; color: #8bd5ca; text-style: bold;
                 border: round #8bd5ca; }
     #board { height: 1fr; padding: 0 1; }
@@ -81,10 +82,10 @@ class Control(App):
     .workspace-card.active { border: round #a6da95; }
     .workspace-card.active .workspace-title { color: #a6da95; }
     .workspace-card:hover { border: round #f5bde6; background: #32364d; }
-    .workspace-title { height: 3; padding: 1 1; background: #3b4059;
+    .workspace-title { height: auto; min-height: 3; padding: 1 1; background: #3b4059;
                        color: #b7bdf8; text-style: bold; }
     .workspace-apps { height: auto; padding: 0 1 1 1; }
-    .program { height: 1; margin: 1 0 0 0; background: #363a4f;
+    .program { height: auto; min-height: 1; margin: 1 0 0 0; background: #363a4f;
                padding: 0 1; text-style: bold; }
     .program:hover { background: #5b6078; color: #ffffff; }
     .tone-0 { color: #91d7e3; } .tone-1 { color: #a6da95; }
@@ -93,6 +94,17 @@ class Control(App):
     .empty-card { color: #b8c0e0; padding: 1; }
     .offline { height: 6; margin: 1 2; padding: 1 2;
                background: #363a4f; color: #eed49f; border: round #eed49f; }
+    Screen.compact #toolbar { layout: vertical; height: 4; padding: 0 1; }
+    Screen.compact #title { width: 1fr; height: 1; }
+    Screen.compact #image-controls { width: 1fr; }
+    Screen.compact #image-label { width: 5; }
+    Screen.compact #image { width: 1fr; min-width: 0; }
+    Screen.compact #overview { margin: 0 1; padding: 0 1; }
+    Screen.compact .board-row { layout: vertical; min-height: 0; }
+    Screen.compact .workspace-card { min-height: 4; }
+    Screen.compact .workspace-title { padding: 0 1; min-height: 1; }
+    Screen.compact .workspace-apps { padding: 0 1; }
+    Screen.compact .program { margin: 0; }
     """
     BINDINGS = [('r', 'refresh', '刷新')]
 
@@ -101,10 +113,11 @@ class Control(App):
         images = ['none', *image_names()]
         with Horizontal(id='toolbar'):
             yield Static('◈  工作台   /   程序调度', id='title')
-            yield Static('背景', id='image-label')
-            yield Select([(n if n != 'none' else '无背景', n) for n in images],
-                         value=cfg['image'] if cfg['image'] in images else 'none',
-                         allow_blank=False, id='image')
+            with Horizontal(id='image-controls'):
+                yield Static('背景', id='image-label')
+                yield Select([(n if n != 'none' else '无背景', n) for n in images],
+                             value=cfg['image'] if cfg['image'] in images else 'none',
+                             allow_blank=False, id='image')
         yield Static('正在读取工作区…', id='overview')
         yield VerticalScroll(id='board')
 
@@ -115,8 +128,12 @@ class Control(App):
         self._refresh_requested = False
         self._operation_pending = False
         self._last_signature = None
+        self.screen.set_class(self.size.width < 80, 'compact')
         self.action_refresh()
         self.set_interval(8, lambda: self.action_refresh(queue_if_busy=False))
+
+    def on_resize(self, event):
+        self.screen.set_class(event.size.width < 80, 'compact')
 
     def message(self, content):
         self.query_one('#overview', Static).update('  ' + content)
