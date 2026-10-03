@@ -1,0 +1,11 @@
+layout {
+    pane size=1 borderless=true {
+        plugin location="zellij:tab-bar"
+    }
+    pane split_direction="horizontal" {
+        pane size="82%" name="Player" command="D:\\terminal-workbench\\apps\\cnmplayer\\cnmplayer.exe"
+        pane name="Spectrum" command="D:\\terminal-workbench\\apps\\spectrum-venv\\Scripts\\python.exe" {
+            args "D:\\terminal-workbench\\apps\\spectrum\\spectrum.py"
+        }
+    }
+}

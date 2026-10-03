@@ -1,0 +1,77 @@
+[flags]
+rate = "1s"
+default_time_value = "60s"
+show_table_scroll_position = true
+show_table_scroll_bar = true
+
+[cpu]
+default = "average"
+show_decimal = true
+
+[processes]
+columns = ["PID", "Name", "CPU%", "Mem%", "R/s", "W/s", "User"]
+default_sort = "CPU%"
+default_memory_value = false
+default_grouped = false
+
+[disk]
+columns = ["Mount", "Used", "Free", "Total", "Used%", "R/s", "W/s"]
+default_sort = "Mount"
+
+[styles.cpu]
+all_entry_colour = "#8aadf4"
+avg_entry_colour = "#f5bde6"
+cpu_core_colours = ["#91d7e3", "#a6da95", "#eed49f", "#f5a97f", "#c6a0f6", "#8aadf4"]
+
+[styles.memory]
+ram_colour = "#a6da95"
+cache_colour = "#eed49f"
+swap_colour = "#f5a97f"
+gpu_colours = ["#8aadf4", "#f5bde6", "#8bd5ca"]
+
+[styles.network]
+rx_colour = "#8bd5ca"
+tx_colour = "#f5bde6"
+rx_total_colour = "#8aadf4"
+tx_total_colour = "#a6da95"
+
+[styles.tables]
+headers = { colour = "#91d7e3", bold = true }
+
+[styles.graphs]
+graph_colour = "#8087a2"
+legend_text = { colour = "#b8c0e0" }
+
+[styles.widgets]
+border_colour = "#8087a2"
+selected_border_colour = "#c6a0f6"
+widget_title = { colour = "#8bd5ca", bold = true }
+text = { colour = "#cad3f5" }
+selected_text = { colour = "#181926", bg_colour = "#b7bdf8" }
+disabled_text = { colour = "#a5adcb" }
+bar_type = "block"
+
+[[row]]
+ratio = 30
+  [[row.child]]
+  type = "cpu"
+
+[[row]]
+ratio = 28
+  [[row.child]]
+  ratio = 2
+  type = "disk"
+  [[row.child]]
+  ratio = 1
+  type = "mem"
+
+[[row]]
+ratio = 17
+  [[row.child]]
+  type = "net"
+
+[[row]]
+ratio = 25
+  [[row.child]]
+  type = "proc"
+  default = true

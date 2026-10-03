@@ -1,0 +1,13 @@
+layout {
+    pane size=1 borderless=true {
+        plugin location="zellij:tab-bar"
+    }
+    pane split_direction="vertical" {
+        pane size="38%" name="Files" command="C:\\Windows\\System32\\cmd.exe" {
+            args "/d" "/c" "D:\\terminal-workbench\\Start-Yazi.cmd"
+        }
+        pane name="Shell" command="C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" {
+            args "-NoLogo" "-NoProfile" "-NoExit" "-ExecutionPolicy" "Bypass" "-File" "D:\\terminal-workbench\\Start-WorkShell.ps1"
+        }
+    }
+}

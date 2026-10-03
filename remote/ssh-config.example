@@ -1,0 +1,7 @@
+# Copy this entry into your local SSH config, then fill in your own values.
+# Do not commit the completed file or your private key.
+Host workbench-linux
+    HostName example.com
+    User your_user
+    ServerAliveInterval 30
+    ServerAliveCountMax 3

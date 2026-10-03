@@ -1,0 +1,72 @@
+general:
+  startup_commands: []
+  shutdown_commands: []
+  config_reload_commands: []
+  focus_follows_cursor: false
+  toggle_workspace_on_refocus: false
+  hide_method: 'cloak'
+  show_all_in_taskbar: false
+
+gaps:
+  scale_with_dpi: true
+  inner_gap: '8px'
+  outer_gap:
+    top: '4px'
+    right: '8px'
+    bottom: '8px'
+    left: '8px'
+
+window_behavior:
+  initial_state: 'tiling'
+  state_defaults:
+    floating:
+      centered: true
+      shown_on_top: false
+    fullscreen:
+      maximized: false
+      shown_on_top: false
+
+workspaces:
+  - name: '1'
+    display_name: 'Work'
+  - name: '2'
+    display_name: 'Browser'
+  - name: '3'
+    display_name: 'Music'
+  - name: '4'
+    display_name: 'Other'
+
+window_rules:
+  - commands: ['ignore']
+    match:
+      - window_process: { equals: 'yasb' }
+
+keybindings:
+  - commands: ['focus --direction left']
+    bindings: ['ctrl+alt+h']
+  - commands: ['focus --direction right']
+    bindings: ['ctrl+alt+l']
+  - commands: ['focus --direction up']
+    bindings: ['ctrl+alt+k']
+  - commands: ['focus --direction down']
+    bindings: ['ctrl+alt+j']
+  - commands: ['focus --workspace 1']
+    bindings: ['ctrl+alt+1']
+  - commands: ['focus --workspace 2']
+    bindings: ['ctrl+alt+2']
+  - commands: ['focus --workspace 3']
+    bindings: ['ctrl+alt+3']
+  - commands: ['focus --workspace 4']
+    bindings: ['ctrl+alt+4']
+  - commands: ['move --workspace 1', 'focus --workspace 1']
+    bindings: ['ctrl+alt+shift+1']
+  - commands: ['move --workspace 2', 'focus --workspace 2']
+    bindings: ['ctrl+alt+shift+2']
+  - commands: ['move --workspace 3', 'focus --workspace 3']
+    bindings: ['ctrl+alt+shift+3']
+  - commands: ['move --workspace 4', 'focus --workspace 4']
+    bindings: ['ctrl+alt+shift+4']
+  - commands: ['toggle-floating --centered']
+    bindings: ['ctrl+alt+space']
+  - commands: ['wm-exit']
+    bindings: ['ctrl+alt+shift+e']

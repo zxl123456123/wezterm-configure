@@ -1,0 +1,1 @@
+require("cwd-memory"):setup()

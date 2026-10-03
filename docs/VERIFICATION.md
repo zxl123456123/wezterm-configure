@@ -1,0 +1,74 @@
+# 发布验证与限制
+
+本页记录 2026-10-03 本次安全配置快照的验证，不把以往的口头结论当作本轮证据。本轮只在仓库和隔离夹具中验证，不替换运行目录，也不重新启动使用中的会话。
+
+## 本轮实际执行
+
+| 检查 | 结果 | 边界 |
+| --- | --- | --- |
+| Control 刷新测试 | 8 项，退出码 0 | Textual 离线夹具，模拟窗口查询，不移动真实窗口 |
+| Music 恢复测试 | 17 项，退出码 0 | 模拟 CLI、状态与文件锁，不启动或替换真实 Player |
+| Spectrum 测试 | 8 项，退出码 0 | 纯计算、渲染节流与诊断测试，不采集真实音频 |
+| 启动错误报告测试 | 6 项，退出码 0 | PowerShell / CMD 隔离夹具；含失败、超时、恢复、两种 CMD 分支 |
+| Python 语法 | 7 个文件，退出码 0 | 编译源文本，不生成 pycache |
+| TOML / JSON / YAML | 3 / 1 / 2 个文件，退出码 0 | 语法解析，不等于所有软件的运行时语义验收 |
+| PowerShell 语法 | 5 个文件，退出码 0 | 只解析，不执行真实启动器 |
+| 远端 Bash 语法 | 2 个文件分别检查，退出码 0 | 不连接或修改服务器 |
+| Zellij 配置检查 | `setup --check`，退出码 0 | 报告配置 Well defined；不启动布局，不证明所有 KDL 命令可用 |
+| WezTerm 配置 / 字体检查 | `ls-fonts --text abc`，退出码 0 | Lua 配置可加载；不是新窗口或图像协议实测 |
+| CNMPlayer 补丁 | `git apply --check`，退出码 0 | 隔离副本 HEAD 为指定上游提交，不重新编译 Rust |
+| 运行源文件保护 | 50 个事前 SHA256 均未变化 | 42 份公开复制件逐字节相同；另一份测试只适配导出目录名 |
+| 公开模板 | SSH 别名 / 示例目录 / 空 API key 已检查 | 不发布真实连接、账号或历史路径 |
+| Git 忽略覆盖 | 16 个私有/运行路径忽略，7 个公开路径可跟踪 | 另检查暂存清单；ignore 不保护已跟踪的秘密 |
+
+合计 **39 项 Python 离线测试**；测试输出中有意模拟的子命令非零退出是断言对象，不是测试失败。YAML 检查依赖 PyYAML 6.0.3，只安装在被忽略的 `.validation/python` 中，未加入运行环境或应用依赖。
+
+## 可重复的测试入口
+
+从仓库根目录执行，临时文件可设到 D 盘隔离目录：
+
+```powershell
+New-Item -ItemType Directory -Force .validation\tmp
+$env:PYTHONDONTWRITEBYTECODE = '1'
+$env:TEMP = (Resolve-Path .validation\tmp).Path
+$env:TMP = $env:TEMP
+python apps/control-center/tests/test_control_refresh.py --source apps/control-center/control_tui.py
+python apps/control-center/tests/test_music_restore.py -v
+python apps/spectrum/tests/test_spectrum.py -v
+python tests/test_startup_reporting.py --source-dir .
+```
+
+请逐条检查退出码，不通过管道截断测试输出。Control 测试的 `--source` 必须保留，避免默认路径指向本机旧更新目录。未附带的旧渲染基线不纳入此次测试；不要设置依赖旧目录的 `SPECTRUM_LEGACY`。
+
+配置与补丁检查：
+
+```powershell
+D:\terminal-workbench\apps\zellij\zellij.exe --config config/zellij/config.kdl setup --check
+D:\terminal-workbench\apps\wezterm\wezterm.exe --config-file config/wezterm/wezterm.lua ls-fonts --text abc
+git -C D:\MyGit1\CNMPlayer-workbench apply --check D:\MyGit1\wezterm-configure\patches\cnmplayer\windows-input.patch
+```
+
+最后一行需要未应用补丁、处于指定提交的干净上游源码，不能在已修改的运行源码上重复应用。
+
+## 本轮遇到的问题与处理
+
+- 导出后的启动测试曾退出 1：旧夹具把任意行中的 `wezterm` 都当作 GUI 启动，误伤包含仓库名 `wezterm-configure` 的临时路径，CMD 六种子场景被阻止。单场景复现后，只在公开测试副本改为检查行首命令，并补上目录名回归断言；真实启动脚本未改。完整 6 项随后重跑退出 0。
+- 一次读取长测试输出的编排失败，未拿到该次最终退出码；该次不算验证证据。随后重新完整运行并读取输出和退出码，未依赖截断结果。
+- 初稿 ignore 的递归放行规则覆盖了 Python 缓存规则。提交前移除过宽的放行，两种源码目录仍可跟踪；逐个验证缓存、日志、环境文件、二进制、图片与字体的忽略效果。此前没有缓存文件被暂存。
+- 初始补丁导出因 CRLF 被误计为整文件变化，未发布该版本；使用 Git 的文本换行规范生成仅含三文件的补丁，再在独立上游副本检查可应用。
+- 校验环境最初没有 PyYAML，系统/捆绑环境探测分别报依赖不存在。仅向仓库隔离目录安装校验依赖后解析 YAML；没有修改工作台 Python 环境。
+- Control 测试出现约 0.109–0.453 秒的 asyncio 慢回调诊断，8 项仍退出 0。这是夹具中的诊断，不是实际 CPU 降幅或实时流畅性的测量。
+- GitHub CLI 初始没有登录；公开仓库读取正常。提交与推送结果需以实际 Git 命令和远端提交 ID 为准，不把 CLI 登录探测当作已推送。
+- 首次暂存空白检查退出 2：验证文档多余末尾空行已移除；补丁的六行单空格是 unified diff 的空白上下文前缀，不能删除。仅对 `.patch` 保留格式并关闭普通源码空白规则，再复查暂存差异与补丁可应用性。Git 的 LF/CRLF 提示来自显式换行属性，不修改本机源文件。
+
+## 未在本轮验收
+
+⛔ 新电脑从零安装、第三方二进制供应链和完整一键安装。
+
+⛔ 播放器真实登录、真实歌曲播放与 F7/F8/F9 的实机输入；Rust 完整构建与测试。本次包含相应补丁与测试源码，但未在本轮重建。
+
+⛔ Windows 窗口拖动/焦点/多显示器、YASB 交互、原生 Yazi 图片预览和音频设备切换。
+
+⛔ 关闭/重启真实会话后的恢复、并发双击启动、所有后台性能和长时间稳定性。为不影响现用开发环境，未执行此类破坏性或交互验收。
+
+已知限制见 [配置说明](CONFIGURATION.md) 与 [日常使用](USAGE.md)。本仓库是已实现工作台的安全源码快照，不保证当前使用方式之外的任意 Windows、Zellij 构建或硬件环境。

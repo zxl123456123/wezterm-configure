@@ -1,0 +1,18 @@
+layout {
+    pane size=1 borderless=true {
+        plugin location="zellij:tab-bar"
+    }
+    pane split_direction="vertical" {
+        pane size="44%" name="Remote Main" command="C:\\Windows\\System32\\OpenSSH\\ssh.exe" {
+            args "-t" "workbench-linux" "bash ~/.local/share/terminal-workbench/pane.sh main"
+        }
+        pane size="55%" {
+            pane size="39%" name="Remote Dev" command="C:\\Windows\\System32\\OpenSSH\\ssh.exe" {
+                args "-t" "workbench-linux" "bash ~/.local/share/terminal-workbench/pane.sh dev"
+            }
+            pane size="60%" name="Remote Files" command="C:\\Windows\\System32\\OpenSSH\\ssh.exe" {
+                args "-t" "workbench-linux" "bash ~/.local/share/terminal-workbench/pane.sh files"
+            }
+        }
+    }
+}

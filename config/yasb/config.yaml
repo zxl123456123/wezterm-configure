@@ -1,0 +1,97 @@
+show_systray: true
+update_check: false
+
+bars:
+  workbench-bar:
+    enabled: true
+    screens: ['*']
+    alignment:
+      position: top
+      align: center
+    style: bar
+    dimensions:
+      width: '100%'
+      height: 36
+    window_flags:
+      always_on_top: true
+      windows_app_bar: true
+    widgets:
+      left: ['quick_launch', 'glazewm_workspaces']
+      center: ['media']
+      right: ['cpu', 'traffic', 'disk_c', 'clock']
+
+widgets:
+  quick_launch:
+    type: 'yasb.quick_launch.QuickLaunchWidget'
+    options:
+      label: 'Search'
+      search_placeholder: 'Apps, dev, pv, ip...'
+      providers:
+        apps:
+          enabled: true
+        dev_tools:
+          enabled: true
+          prefix: 'dev'
+        port_viewer:
+          enabled: true
+          prefix: 'pv'
+        ip_info:
+          enabled: true
+          prefix: 'ip'
+      callbacks:
+        on_left: 'toggle_quick_launch'
+  glazewm_workspaces:
+    type: 'glazewm.workspaces.GlazewmWorkspacesWidget'
+    options:
+      offline_label: 'Desktop'
+      hide_if_offline: false
+      enable_scroll_switching: true
+  active_window:
+    type: 'yasb.active_window.ActiveWindowWidget'
+    options:
+      label: '{win[title]}'
+      label_alt: '{win[title]}'
+  media:
+    type: 'yasb.media.MediaWidget'
+    options:
+      label: '{title} - {artist}'
+      hide_empty: true
+  cpu:
+    type: 'yasb.cpu.CpuWidget'
+    options:
+      label: 'CPU {info[percent][total]}%  {info[histograms][cpu_percent]}'
+      update_interval: 1000
+      histogram_num_columns: 12
+      callbacks:
+        on_left: 'toggle_menu'
+      menu:
+        enabled: true
+        show_graph: true
+        show_graph_grid: true
+        graph_history_size: 60
+  traffic:
+    type: 'yasb.traffic.TrafficWidget'
+    options:
+      label: 'NET ↓{download_speed} ↑{upload_speed}'
+      speed_unit: 'bytes'
+      update_interval: 1000
+      callbacks:
+        on_left: 'toggle_menu'
+  disk_c:
+    type: 'yasb.disk.DiskWidget'
+    options:
+      volume_label: 'C'
+      label: 'C {space[used][percent]} used'
+      update_interval: 60
+      group_label:
+        volume_labels: ['C', 'D', 'E', 'G']
+        show_label_name: true
+        alignment: 'right'
+        direction: 'down'
+      callbacks:
+        on_left: 'toggle_group'
+  clock:
+    type: 'yasb.clock.ClockWidget'
+    options:
+      label: '{%m-%d %H:%M}'
+      update_interval: 1000

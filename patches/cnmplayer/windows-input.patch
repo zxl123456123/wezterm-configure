@@ -1,0 +1,192 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index 1e3395b..6d8634e 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -3171,7 +3171,6 @@ dependencies = [
+  "base64-simd",
+  "icy_sixel",
+  "image",
+- "pkg-config",
+  "rand 0.8.7",
+  "ratatui",
+  "rustix 0.38.44",
+diff --git a/Cargo.toml b/Cargo.toml
+index 55d46cb..cfb7141 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -11,7 +11,7 @@ toml = "1.1"
+ log = "0.4"
+ ftail = "0.3"
+ ratatui = { version = "0.30", default-features = false, features = ["crossterm", "layout-cache"] }
+-ratatui-image = { version = "11", default-features = false, features = ["crossterm", "chafa-dyn"] }
++ratatui-image = { version = "11", default-features = false, features = ["crossterm"] }
+ crossterm = { version = "0.29", features = ["event-stream"] }
+ directories = "6"
+ futures = "0.3"
+diff --git a/src/tmplayer/utils/input.rs b/src/tmplayer/utils/input.rs
+index 532f28d..858e169 100644
+--- a/src/tmplayer/utils/input.rs
++++ b/src/tmplayer/utils/input.rs
+@@ -1,6 +1,8 @@
+ use crate::tmplayer::app::state::Overlay;
+ use crate::tmplayer::data::config::Config;
+-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
++use crossterm::event::{
++    KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
++};
+ 
+ #[derive(Debug, Clone, Copy, PartialEq)]
+ pub enum Action {
+@@ -52,6 +54,9 @@ pub enum Action {
+ }
+ 
+ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
++    if ev.kind != KeyEventKind::Press {
++        return Action::None;
++    }
+     if overlay == Overlay::AcoustIdModal {
+         match ev.code {
+             KeyCode::Esc => return Action::CloseOverlay,
+@@ -216,15 +221,21 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
+         return Action::ToggleFavorite;
+     }
+ 
+-    if keybind_matches(&config.keybind_fullscreen_prev, ev) {
++    if keybind_matches(&config.keybind_fullscreen_prev, ev)
++        || keybind_matches(&config.keybind_prev, ev)
++    {
+         return Action::Prev;
+     }
+ 
+-    if keybind_matches(&config.keybind_fullscreen_next, ev) {
++    if keybind_matches(&config.keybind_fullscreen_next, ev)
++        || keybind_matches(&config.keybind_next, ev)
++    {
+         return Action::Next;
+     }
+ 
+-    if keybind_matches(&config.keybind_fullscreen_toggle_play_pause, ev) {
++    if keybind_matches(&config.keybind_fullscreen_toggle_play_pause, ev)
++        || keybind_matches(&config.keybind_toggle_play_pause, ev)
++    {
+         return Action::TogglePlayPause;
+     }
+ 
+@@ -430,3 +441,117 @@ fn key_code_to_keybind_token(code: KeyCode) -> Option<String> {
+         _ => None,
+     }
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn music_config() -> Config {
++        Config {
++            keybind_prev: "F7".into(),
++            keybind_toggle_play_pause: "F8".into(),
++            keybind_next: "F9".into(),
++            keybind_fullscreen_prev: "Left".into(),
++            keybind_fullscreen_toggle_play_pause: "Space".into(),
++            keybind_fullscreen_next: "Right".into(),
++            ..Config::default()
++        }
++    }
++
++    #[test]
++    fn host_music_keys_work_in_fullscreen() {
++        let config = music_config();
++        for (code, action) in [
++            (KeyCode::F(7), Action::Prev),
++            (KeyCode::F(8), Action::TogglePlayPause),
++            (KeyCode::F(9), Action::Next),
++        ] {
++            assert_eq!(
++                map_key(KeyEvent::new(code, KeyModifiers::NONE), Overlay::None, &config),
++                action
++            );
++        }
++    }
++
++    #[test]
++    fn existing_fullscreen_keys_still_work() {
++        let config = music_config();
++        for (code, action) in [
++            (KeyCode::Left, Action::Prev),
++            (KeyCode::Char(' '), Action::TogglePlayPause),
++            (KeyCode::Right, Action::Next),
++        ] {
++            assert_eq!(
++                map_key(KeyEvent::new(code, KeyModifiers::NONE), Overlay::None, &config),
++                action
++            );
++        }
++    }
++
++    #[test]
++    fn configured_fullscreen_keys_still_work() {
++        let config = Config {
++            keybind_fullscreen_prev: "F1".into(),
++            keybind_fullscreen_toggle_play_pause: "F2".into(),
++            keybind_fullscreen_next: "F3".into(),
++            ..music_config()
++        };
++        for (code, action) in [
++            (KeyCode::F(1), Action::Prev),
++            (KeyCode::F(2), Action::TogglePlayPause),
++            (KeyCode::F(3), Action::Next),
++        ] {
++            assert_eq!(
++                map_key(KeyEvent::new(code, KeyModifiers::NONE), Overlay::None, &config),
++                action
++            );
++        }
++    }
++
++    #[test]
++    fn release_and_repeat_events_are_ignored() {
++        let config = music_config();
++        for kind in [KeyEventKind::Release, KeyEventKind::Repeat] {
++            for code in [
++                KeyCode::F(7), KeyCode::F(8), KeyCode::F(9), KeyCode::Left,
++                KeyCode::Right, KeyCode::Char(' '), KeyCode::Enter, KeyCode::Esc,
++            ] {
++                for overlay in [Overlay::None, Overlay::SettingsModal, Overlay::Playlist] {
++                    assert_eq!(
++                        map_key(KeyEvent::new_with_kind(code, KeyModifiers::NONE, kind), overlay, &config),
++                        Action::None
++                    );
++                }
++            }
++        }
++    }
++
++    #[test]
++    fn overlays_consume_music_keys_before_playback() {
++        let config = music_config();
++        for overlay in [
++            Overlay::Playlist, Overlay::SettingsModal, Overlay::BarSettingsModal,
++            Overlay::LocalAudioSettingsModal, Overlay::AboutModal,
++            Overlay::AcoustIdModal, Overlay::HelpModal, Overlay::EqModal,
++        ] {
++            for code in [KeyCode::F(7), KeyCode::F(8), KeyCode::F(9)] {
++                assert_eq!(
++                    map_key(KeyEvent::new(code, KeyModifiers::NONE), overlay, &config),
++                    Action::None
++                );
++            }
++        }
++        assert_eq!(
++            map_key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE), Overlay::AcoustIdModal, &config),
++            Action::FolderChar(' ')
++        );
++        assert_eq!(
++            map_key(KeyEvent::new(KeyCode::Left, KeyModifiers::NONE), Overlay::SettingsModal, &config),
++            Action::ModalLeft
++        );
++        assert_eq!(
++            map_key(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE), Overlay::EqModal, &config),
++            Action::ModalRight
++        );
++    }
++}

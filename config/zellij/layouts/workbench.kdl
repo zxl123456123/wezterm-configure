@@ -1,0 +1,51 @@
+layout {
+    default_tab_template {
+        pane size=1 borderless=true {
+            plugin location="zellij:tab-bar"
+        }
+        children
+    }
+    tab name="Work-Windows" focus=true {
+        pane split_direction="vertical" {
+            pane size="38%" name="Files" command="C:\\Windows\\System32\\cmd.exe" {
+                args "/d" "/c" "D:\\terminal-workbench\\Start-Yazi.cmd"
+            }
+            pane name="Shell" command="C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" {
+                args "-NoLogo" "-NoProfile" "-NoExit" "-ExecutionPolicy" "Bypass" "-File" "D:\\terminal-workbench\\Start-WorkShell.ps1"
+            }
+        }
+    }
+    tab name="Work-for-Linux" {
+        pane split_direction="vertical" {
+            pane size="44%" name="Remote Main" command="C:\\Windows\\System32\\OpenSSH\\ssh.exe" {
+                args "-t" "workbench-linux" "bash ~/.local/share/terminal-workbench/pane.sh main"
+            }
+            pane size="55%" {
+                pane size="39%" name="Remote Dev" command="C:\\Windows\\System32\\OpenSSH\\ssh.exe" {
+                    args "-t" "workbench-linux" "bash ~/.local/share/terminal-workbench/pane.sh dev"
+                }
+                pane size="60%" name="Remote Files" command="C:\\Windows\\System32\\OpenSSH\\ssh.exe" {
+                    args "-t" "workbench-linux" "bash ~/.local/share/terminal-workbench/pane.sh files"
+                }
+            }
+        }
+    }
+    tab name="Monitor" {
+        pane name="System Monitor" command="D:\\terminal-workbench\\apps\\bottom\\btm.exe" {
+            args "--config_location" "D:\\terminal-workbench\\config\\bottom\\readable.toml"
+        }
+    }
+    tab name="Music" {
+        pane split_direction="horizontal" {
+            pane size="82%" name="Player" command="D:\\terminal-workbench\\apps\\cnmplayer\\cnmplayer.exe"
+            pane name="Spectrum" command="D:\\terminal-workbench\\apps\\spectrum-venv\\Scripts\\python.exe" {
+                args "D:\\terminal-workbench\\apps\\spectrum\\spectrum.py"
+            }
+        }
+    }
+    tab name="Control" {
+        pane name="Control" command="D:\\terminal-workbench\\apps\\spectrum-venv\\Scripts\\python.exe" {
+            args "D:\\terminal-workbench\\apps\\control-center\\control_tui.py"
+        }
+    }
+}

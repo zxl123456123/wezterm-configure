@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Workbench Control Center</title>
+  <style>
+    :root { color-scheme: dark; --bg:#1e2030; --panel:#24273a; --panel2:#363a4f; --line:#494d64; --text:#cad3f5; --muted:#a5adcb; --blue:#8aadf4; --pink:#f5bde6; --green:#a6da95; --red:#ed8796; }
+    * { box-sizing:border-box; }
+    body { margin:0; font:14px/1.5 'Segoe UI',sans-serif; background:radial-gradient(circle at 88% 0%,#514c73,transparent 34%),radial-gradient(circle at 0% 85%,#303e59,transparent 40%),var(--bg); color:var(--text); }
+    header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:22px 28px; border-bottom:1px solid var(--line); }
+    h1 { margin:0; font-size:22px; letter-spacing:.02em; }
+    .sub { color:var(--muted); font-size:12px; }
+    main { max-width:1500px; margin:auto; padding:24px; display:grid; grid-template-columns:minmax(0,1fr) 350px; gap:20px; }
+    section { background:rgba(36,39,58,.82); border:1px solid #8aadf429; border-radius:24px; padding:22px; box-shadow:0 16px 44px #0003; backdrop-filter:blur(18px); }
+    section h2 { margin:0 0 4px; font-size:17px; }
+    .topline { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; }
+    .workspace-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .workspace { border:1px solid #8aadf42e; background:linear-gradient(145deg,#3c405c,#30344c); border-radius:20px; padding:17px; min-height:150px; transition:transform .2s,box-shadow .2s,border-color .2s; }
+    .workspace:hover,.workspace.drop-target { transform:translateY(-2px); box-shadow:0 12px 30px #0003; border-color:var(--pink); }
+    .workspace.active { border-color:var(--blue); }
+    .workspace-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .workspace-name { font-weight:700; }
+    .count { color:var(--muted); font-size:12px; }
+    .window { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; padding:12px; margin:9px 0; border:1px solid #8aadf420; border-radius:16px; background:#24273ad9; cursor:grab; transition:background .2s,transform .2s; }
+    .window:hover { background:#41455f; transform:translateX(3px); }
+    .window-title { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-weight:600; }
+    .window-meta { color:var(--muted); font-size:11px; }
+    .window-actions { display:flex; flex-wrap:wrap; gap:5px; justify-content:flex-end; }
+    button, select { background:#494d64; color:var(--text); border:1px solid #6e738d; border-radius:12px; padding:7px 12px; cursor:pointer; font:inherit; }
+    button:hover, select:hover { border-color:var(--blue); background:#555b79; }
+    button.primary { background:#5575ad; border-color:var(--blue); }
+    button.mini { padding:4px 7px; font-size:11px; }
+    .empty { color:var(--muted); padding:14px 0; font-size:12px; }
+    .sidebar { display:flex; flex-direction:column; gap:20px; }
+    .field { margin:17px 0; }
+    .field label { display:flex; justify-content:space-between; color:var(--muted); margin-bottom:6px; }
+    input[type=range] { width:100%; height:10px; accent-color:var(--blue); cursor:pointer; }
+    #image-opacity { accent-color:var(--pink); } #dim { accent-color:#eed49f; }
+    .scale { display:flex; justify-content:space-between; color:var(--muted); font-size:11px; margin-top:3px; }
+    .explain { color:var(--muted); font-size:12px; margin:0 0 6px; }
+    #real-preview { height:180px; border-radius:18px; overflow:hidden; position:relative; background:repeating-conic-gradient(#70758d 0 25%,#a4aac3 0 50%) 50%/28px 28px; margin:18px 0; }
+    #preview-surface { position:absolute; inset:0; background:#24273a; }
+    #real-preview img { width:100%; height:100%; object-fit:cover; display:block; }
+    #preview-dim { position:absolute; inset:0; background:#24273a; pointer-events:none; }
+    #preview-caption { position:absolute; bottom:12px; left:14px; color:white; font-weight:700; text-shadow:0 2px 8px #000; }
+    select.full { width:100%; }
+    .hint { color:var(--muted); font-size:12px; margin-top:8px; }
+    #message { min-height:20px; color:var(--green); font-size:12px; }
+    #warning { color:var(--red); }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; }
+    code { color:var(--pink); }
+    @media(max-width:1000px) { main { grid-template-columns:1fr; } }
+    @media(max-width:650px) { .workspace-grid { grid-template-columns:1fr; } header { align-items:flex-start; flex-direction:column; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div><h1>Workbench Control Center</h1><div class="sub">窗口调度 · 背景切换 · 标签恢复</div></div>
+    <div class="sub" id="updated">准备读取 GlazeWM…</div>
+  </header>
+  <main>
+    <section>
+      <div class="topline"><div><h2>工作区与窗口</h2><div class="sub">按显示器分组 · 拖动程序卡片到目标工作区 · 单击聚焦</div></div><button id="refresh">刷新</button></div>
+      <div id="warning"></div>
+      <div class="workspace-grid" id="workspaces"></div>
+      <div class="hint">仅列出 GlazeWM 正在管理的窗口；最小化窗口也会显示。系统任务管理器中的后台进程并不是桌面窗口。</div>
+    </section>
+    <div class="sidebar">
+      <section>
+        <h2>背景图片</h2>
+        <div class="field"><label>背景图片</label><select class="full" id="image"></select></div>
+        <div class="actions"><button class="primary" id="save">切换背景</button></div>
+      </section>
+      <section>
+        <h2>布局维护</h2>
+        <p class="sub">误关 Music 标签时，无需重启所有工作窗格。</p>
+        <button class="primary" id="restore-music">恢复／跳转 Music 标签</button>
+        <p class="hint">WezTerm 的 Control 标签顶部也能切换背景。</p>
+      </section>
+      <section><div id="message">就绪</div></section>
+    </div>
+  </main>
+  <script>
+    const token='__TOKEN__';
+    const $=id=>document.getElementById(id);
+    let groups=[];
+    let initialized=false;
+    function message(text,error=false){$('message').textContent=text;$('message').style.color=error?'#ed8796':'#a6da95'}
+    async function post(path,data){
+      const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-Workbench-Token':token},body:JSON.stringify(data)});
+      const body=await r.json();
+      if(!r.ok)throw Error(body.error||'操作失败');
+      return body.result;
+    }
+    function button(text,click){const b=document.createElement('button');b.textContent=text;b.className='mini';b.onclick=click;return b}
+    function render(groups){
+      const root=$('workspaces');root.replaceChildren();
+      for(const group of groups){
+        const card=document.createElement('div');card.className='workspace'+(group.hasFocus?' active':'');
+        card.ondragover=e=>{e.preventDefault();card.classList.add('drop-target')};
+        card.ondragleave=()=>card.classList.remove('drop-target');
+        card.ondrop=async e=>{e.preventDefault();card.classList.remove('drop-target');const id=e.dataTransfer.getData('text/plain');if(!id)return;try{await post('/api/window',{action:'move',id,workspace:group.name});message('已移动到 '+group.displayName);refresh()}catch(err){message(err.message,true)}};
+        const head=document.createElement('div');head.className='workspace-head';
+        const name=document.createElement('span');name.className='workspace-name';name.textContent=group.name+' · '+group.displayName;
+        const count=document.createElement('span');count.className='count';count.textContent=group.windows.length+' 个窗口';
+        head.append(name,count);card.append(head);
+        if(!group.windows.length){const e=document.createElement('div');e.className='empty';e.textContent='暂无受管理的窗口';card.append(e)}
+        for(const win of group.windows){
+          const item=document.createElement('div');item.className='window';item.draggable=true;item.ondragstart=e=>e.dataTransfer.setData('text/plain',win.id);
+          const desc=document.createElement('div');desc.style.minWidth='0';
+          const title=document.createElement('div');title.className='window-title';title.title=win.title||'';title.textContent=win.title||'(无标题)';
+          const meta=document.createElement('div');meta.className='window-meta';meta.textContent=(win.processName||'?')+' · '+win.state+(win.hasFocus?' · 当前焦点':'');
+          desc.append(title,meta);
+          const actions=document.createElement('div');actions.className='window-actions';
+          item.onclick=async()=>{try{await post('/api/window',{action:'focus',id:win.id});message('已聚焦 '+(win.processName||'窗口'));refresh()}catch(e){message(e.message,true)}};
+          item.append(desc,actions);card.append(item);
+        }
+        root.append(card);
+      }
+    }
+    function syncAppearance(a,images){
+      const sel=$('image');sel.replaceChildren();
+      for(const name of ['none',...images]){const opt=document.createElement('option');opt.value=name;opt.textContent=name==='none'?'不显示贴图':name;opt.selected=name===a.image;sel.append(opt)}
+    }
+    async function refresh(){
+      try{const r=await fetch('/api/state',{cache:'no-store'});const data=await r.json();groups=data.workspaces;render(groups);$('warning').textContent=data.warning||'';$('updated').textContent='更新于 '+new Date().toLocaleTimeString();if(!initialized){syncAppearance(data.appearance,data.images);initialized=true}}
+      catch(e){message(e.message,true)}
+    }
+    $('refresh').onclick=()=>{initialized=false;refresh()};
+    $('save').onclick=async()=>{try{await post('/api/appearance',{image:$('image').value});message('背景已切换')}catch(e){message(e.message,true)}};
+    $('restore-music').onclick=async()=>{try{message(await post('/api/music',{}));refresh()}catch(e){message(e.message,true)}};
+    refresh();setInterval(refresh,5000);
+  </script>
+</body>
+</html>

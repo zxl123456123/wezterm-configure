@@ -1,0 +1,5 @@
+# Versions observed in the existing Python 3.12 workbench environment.
+textual==8.2.8
+numpy==2.5.3
+SoundCard==0.4.6
+Pillow==12.3.0

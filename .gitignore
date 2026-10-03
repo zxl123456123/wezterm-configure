@@ -1,0 +1,45 @@
+# Runtime state and private data are never part of the configuration snapshot.
+/data/
+/backups/
+/updates/
+/build/
+/.validation/
+/.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.log
+*.log.*
+*.tmp
+*.lock.local
+.env
+.env.*
+*.local
+*.local.*
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+*cookies*
+*credentials*
+
+# Download third-party applications separately; only custom source is tracked.
+/apps/*
+!/apps/control-center/
+!/apps/spectrum/
+*.exe
+*.dll
+*.msi
+*.zip
+*.7z
+*.pdb
+target/
+
+# Supply your own images and fonts; no redistribution of personal artwork.
+/images/*
+!/images/README.md
+/fonts/*
+!/fonts/README.md
+*.ttf
+*.otf
+*.woff*

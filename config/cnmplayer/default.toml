@@ -1,0 +1,64 @@
+theme = "macchiato"
+ui_fps = 30
+spectrum_hz = 30
+mpris_poll_ms = 100
+visualize = "off"
+eq_bands_db = [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+]
+transparent_background = true
+album_border = true
+graphics_protocol = "halfblocks"
+kitty_cover_scale_percent = 100
+super_smooth_bar = false
+bars_gap = false
+bar_number = "auto"
+bar_channels = "mono"
+bar_channel_reverse = false
+lyrics_cover_fetch = false
+lyrics_cover_download = false
+audio_fingerprint = false
+acoustid_api_key = ""
+resume_last_position = false
+default_opening_title = ""
+language = "zh"
+page_lyrics = true
+audio_quality = "exhigh"
+playback_memory = false
+show_hints = true
+home_more_recommend = false
+keybind_search_box = "Ctrl+S"
+keybind_fullscreen = "Ctrl+F"
+keybind_settings = "T"
+keybind_sidebar = "P"
+keybind_quit = "Q"
+keybind_page_up = "pageUP"
+keybind_page_down = "pageDown"
+keybind_prev = "F7"
+keybind_next = "F9"
+keybind_toggle_play_pause = "F8"
+keybind_toggle_mode = "Alt+M"
+keybind_fullscreen_prev = "Left"
+keybind_fullscreen_next = "Right"
+keybind_fullscreen_toggle_play_pause = "Space"
+keybind_fullscreen_toggle_mode = "M"
+keybind_fullscreen_eq = "E"
+keybind_fullscreen_eq_reset = "Alt+R"
+keybind_toggle_like_fullscreen = "L"
+keybind_toggle_like_collapsed = "Alt+L"
+
+[cache]
+path = "D:\\terminal-workbench\\data\\cnmplayer\\cache"
+clean_strategy = "both"
+max_size_mb = 500
+max_age_days = 7
+clean_on_startup = true

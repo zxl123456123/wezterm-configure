@@ -1,0 +1,20 @@
+// Windows terminal workbench configuration, stored entirely under D:\terminal-workbench.
+theme "catppuccin-macchiato"
+default_layout "workbench"
+layout_dir "D:\\terminal-workbench\\config\\zellij\\layouts"
+
+themes {
+    catppuccin-macchiato {
+        fg 202 211 245
+        bg 36 39 58
+        black 30 32 48
+        red 237 135 150
+        green 166 218 149
+        yellow 238 212 159
+        blue 138 173 244
+        magenta 245 189 230
+        cyan 139 213 202
+        white 202 211 245
+        orange 245 169 127
+    }
+}

@@ -1,0 +1,69 @@
+# 配置说明
+
+本页说明当前实际配置入口和选择理由；快捷键与安装流程分别见 [USAGE](USAGE.md)、[INSTALL](INSTALL.md)。不直接修改全局 Windows Terminal 或其他 WezTerm 窗口的配置。
+
+## WezTerm 外观
+
+入口：`config/wezterm/wezterm.lua` 与 `appearance.json`。
+
+- Catppuccin Macchiato、13pt 字体、1.08 行高；字体目录是运行目录 `fonts`。
+- `window_background_opacity = 1.0`，先画不透明底色，再叠图片和深色遮罩；图片层 0.82、遮罩 0.16、文字背景 0.84。它们是分层参数，不是桌面透明开关。
+- Control 只保存 `appearance.json` 的 `image` 文件名；WezTerm 监听它，图片不存在时使用底色；`none` 禁用图片。
+- 单个 WezTerm 标签时隐藏外层标签栏；Zellij 内上方保留自己的 tab-bar，不放下方快捷键栏。
+- `exit_behavior = Hold` 保留退出信息，避免启动失败消息一闪而过；窗口关闭不弹确认，因此重要任务由使用者自行确认。
+
+✅ 当前选择：静态、易读背景；⛔ 未实现：专门的透明度 UI、全页面粒子场景或鼠标尾迹。
+
+## Zellij 布局与启动
+
+入口：`config/zellij/config.kdl`、`layouts/workbench.kdl`、`Ensure-WorkbenchTabs.ps1`。
+
+固定会话为 `workbench-v4`。主布局负责新会话的五个标签；单标签 KDL 负责缺失标签恢复。统一只发布当前有效布局，不重复旧更新目录里的同类文件。
+
+启动器先检查匹配本工作台参数的 WezTerm 窗口，复用或新开，然后检查标准标签。失败返回非零并写日志，不隐藏失败。没有新增常驻守护、并发启动锁或完整事务式恢复；重复并发启动、CLI 版本不匹配和大量 stdout/stderr 的边界仍需实机观察。
+
+## 路径记忆
+
+| 来源 | 保存文件 | 保存时机与限制 |
+| --- | --- | --- |
+| Windows Shell | `data/work-windows-shell.cwd` | PowerShell prompt 钩子；目录变化才写入；不是每条命令快照 |
+| Windows Yazi | `data/work-windows-yazi.cwd` | `cwd-memory.yazi` 的 cd 事件 |
+| Linux Main / Dev / Files | 远端 `~/.local/state/terminal-workbench/<slot>.cwd` | 交互 Bash prompt；各槽位独立 |
+
+文件不存在或保存目录已删除时回退默认目录。当前路径文件属于运行状态，不提交 Git。原远程 IP 和个人项目路径已换为 SSH 别名/样例，运行目录中的真实连接未被修改。
+
+## Monitor
+
+入口：`config/bottom/readable.toml`。刷新 `1s`，60 秒历史；CPU 30%、磁盘/内存 28%、网络 17%、进程 25% 布局比例。CPU 默认平均曲线，保留小数；进程默认按 CPU 排序，显示滚动位置和滚动条。
+
+采用成熟 bottom 的表格聚焦/排序/滚动，避免自己维护无法滚动的不断增加文本。并未根据本次发布短采样宣称某个 CPU 降幅。
+
+## Control
+
+默认入口 `apps/control-center/control_tui.py`；后端 `control_center.py` 通过 GlazeWM CLI 获取工作区/程序并执行聚焦/移动。
+
+✅ 已实现：8 秒定时检查；查询到 DOM 挂载期间保持刷新互斥；手动/操作请求合并；拖动结束补刷；相同可见内容不构造卡片；查询或 DOM 错误可再次刷新。
+
+继续使用原 Textual worker + 线程查询模型，不新增队列框架或按字段增量渲染。取消异步任务不保证同步终止已进入的底层查询线程；离线测试不是 Windows 鼠标捕获、焦点、拖拽实机验收。
+
+## Music 与频谱
+
+播放器样例：`config/cnmplayer/default.toml`；部署后放 `data/cnmplayer/config/default.toml`。
+
+Macchiato 主题、歌词页启用、F7/F8/F9 播放快捷键、原生 cava 关闭、30fps 播放器 UI。图形协议是 `halfblocks`；歌词/封面抓取开关、网易云账号和内容可用性不要混同。本次发布不宣称乐谱支持。
+
+频谱入口：`apps/spectrum/spectrum.py`。44100Hz / 2048 点窗口；宽度不足时隐藏深度环绕区；宽窗口最高 80 条柱。活动绘制限约 20fps，静音衰减限 4fps，稳定后不重绘/FFT，但仍采集音频；SoundCard 指定的断续警告写两份有界日志，不刷满终端。
+
+恢复入口 `Restore-Music.cmd`：文件锁防止同一恢复同时进行；验证标签/Player/命令/状态后只替换已退出 Player，保留其他面板。不保证捕捉所有外部状态竞态。
+
+## 顶部栏与平铺
+
+YASB：`config/yasb/config.yaml` / `styles.css`，高 36px；左侧搜索和 GlazeWM 工作区、中间媒体、右侧 CPU/网络/磁盘/时钟。磁盘扩展列表为 C/D/E/G；本机没有的盘应删去或改成自己的盘符。
+
+GlazeWM：`config/glazewm/config.yaml`，Work / Browser / Music / Other 四工作区，8px 内间距；不是固定四显示器。Control 读取真实监视器关系，一台监视器可显示多个工作区。
+
+## 个性化与发布安全
+
+默认 `D:\terminal-workbench` 与 `D:\workspace-for-everything` 是公开可复现约定，不是自动检测路径。迁移到其他盘符需搜索所有引用再调整。字体与壁纸请自行提供；Git 只保存可公开的静态配置。
+
+用户配置不应承载登录 Token；不要提交 `data`、`.env`、SSH 配置实值、窗口快照或日志。`.gitignore` 按[Git 官方语义](https://git-scm.com/docs/gitignore)忽略未跟踪运行文件；对已跟踪文件不能靠新增 ignore 消除历史泄漏。
