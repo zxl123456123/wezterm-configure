@@ -11,13 +11,13 @@
 - ✅ 已实现：Spectrum 仅复用参数固定的数据，每个状态保留当前数组，不保存历史尺寸缓存或 FFT 结果；新的音频仍逐帧计算，以保持输出等价而不牺牲动效。
 - ⛔ 未实现：自动安装、音频设备恢复、按标签可见性自动挂起后台。没有为本轮局部优化增加框架、依赖或常驻服务；Monitor 保持 1 秒采样。
 
-源码更新只在新应用进程加载；现用会话与真实音频不由离线验证替代。历史决策及交付证据见[优化归档摘要](archive/2026-10-03/workbench-refinements-20261003/SUMMARY.md)，功能细节见下文，验证边界见 [VERIFICATION](VERIFICATION.md)。
+Shell、Control、Spectrum 的源码更新需要新进程加载；WezTerm 外观 Lua 部署到运行目录后可重载，不必重启开发会话。现用会话与真实音频不由离线验证替代。历史决策及交付证据见[优化归档摘要](archive/2026-10-03/workbench-refinements-20261003/SUMMARY.md)，功能细节见下文，验证边界见 [VERIFICATION](VERIFICATION.md)。
 
 ## WezTerm 外观
 
 入口：`config/wezterm/wezterm.lua` 与 `appearance.json`。
 
-- Catppuccin Macchiato、13pt 字体、1.08 行高；字体目录是运行目录 `fonts`。
+- Catppuccin Macchiato、11pt 字体、1.08 行高；字体目录是运行目录 `fonts`。缩小默认字号以便同屏阅读更多代码，保留原面板比例与配色。
 - `window_background_opacity = 1.0`，先画不透明底色，再叠图片和深色遮罩；图片层 0.82、遮罩 0.16、文字背景 0.84。它们是分层参数，不是桌面透明开关。
 - Control 只保存 `appearance.json` 的 `image` 文件名；WezTerm 监听它，图片不存在时使用底色；`none` 禁用图片。
 - 单个 WezTerm 标签时隐藏外层标签栏；Zellij 内上方保留自己的 tab-bar，不放下方快捷键栏。

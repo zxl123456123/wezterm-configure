@@ -8,7 +8,7 @@ config.font = wezterm.font_with_fallback({
   'Maple Mono NF',
   'JetBrains Mono',
 })
-config.font_size = 13.0
+config.font_size = 11.0
 config.line_height = 1.08
 config.initial_cols = 150
 config.initial_rows = 44

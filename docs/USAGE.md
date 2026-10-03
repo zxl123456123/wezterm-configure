@@ -1,5 +1,15 @@
 # 快捷键与日常操作
 
+## 启动与加载更新
+
+双击 `D:\terminal-workbench\launchers\01-WezTerm-Only.cmd` 只启动终端工作台；需要顶部栏和平铺时用同目录的 `00-All.cmd`。已有工作台窗口时复用它并补齐缺失标签，不重启正在运行的开发任务。
+
+启动器固定读取 `D:\terminal-workbench\config\wezterm\wezterm.lua`，不是 Git 仓库中的副本。拉取仓库不会自动部署；先备份运行文件并仅替换已验证的对应配置，重载才会加载这次更新。
+
+WezTerm 外观配置默认自动重载；也可按 `Ctrl+Shift+R` 手动重载。默认字号为 11pt；如果此前手动缩放过，按 `Ctrl+0` 恢复配置字号，`Ctrl+-` / `Ctrl++` 临时缩小 / 放大。这些操作不重新启动 Shell。
+
+重新连接 Zellij 仍会保留旧进程，因此 Shell 补全、高亮等源码更新需要新开 Shell，具体命令见下文。Music 缺失或 Player 退出时使用 `D:\terminal-workbench\Restore-Music.cmd`，不必关闭整个会话。
+
 ## 标签与面板
 
 下表是当前采用的 Zellij 默认快捷键，不是本仓库自定义按键插件。“然后”表示松开前一组后再按下一键。当前 `config.kdl` 不额外覆写默认键位；若使用不同构建或修改了模式，按你的 Zellij 实际配置核对。

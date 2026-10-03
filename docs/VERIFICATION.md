@@ -2,6 +2,18 @@
 
 本页保留 2026-10-03 首次安全配置快照的验证，以及后续增量实施证据。首次快照验证阶段只在仓库和隔离夹具中验证，当时未替换运行目录或重新启动使用中的会话；后续受控交付由各阶段承接记录说明，不把阶段测试结果解释为当前实例已加载。
 
+## 紧凑字号与 Music 恢复（2026-10-03）
+
+仓库 Lua 默认字号改为 11pt，其他外观与布局参数不变。实际 WezTerm 指定仓库 `config/wezterm/wezterm.lua` 执行 `ls-fonts --text abc`，exit 0，使用 D 盘 Maple Mono 字体；`show-keys --lua`、字号/重载/重置键位断言及 `git diff --check` 均 exit 0。这些是仓库配置检查，不代表已经交付到启动器读取的 `D:\terminal-workbench\config\wezterm\wezterm.lua`，也不代表窗口缩放覆盖已重置。运行副本更新后必要时按 `Ctrl+Shift+R`、`Ctrl+0`。
+
+实机会话中的 Music 原先不存在。使用既有 `music.kdl` 与 Zellij 原生 `new-tab --no-focus` 单独恢复，exit 0；随后检查 Player、Spectrum 均未退出，对应 CNMPlayer 与 Python 进程存活。全部既有面板身份/退出状态、记录的既有进程身份与当前 Linux 标签保持不变；没有替换开发 Shell 或重启会话。新标签附加在末尾，不重排用户现有标签。
+
+本轮没有修改 Music 源码、重建播放器、登录账号或操作歌曲；进程存活不代表真实播放、暂停/切歌及频谱视觉效果已经验收。未重跑未改动的播放器、Control、Spectrum 全量测试。
+
+保留过程问题：首次从仓库根读取文档维护规范报路径不存在；该组合命令的最终 exit 0 不作为该文件已读取的证据。通过文件搜索找到 `docs/Docs.Maintenance.Conventions.md` 后完整重读。首次合并长输出被截断，相关现行章节另行读取，不把截断内容作为完整验证证据。
+
+独立审查首轮键位断言夹具误用引号与修饰键顺序，exit 1；按实际 CLI 输出修正夹具后 exit 0，未修改产品键位。审查指出仓库/运行副本加载边界不明确、应用源码新进程规则未排除 Lua 重载；已在现行使用和配置说明中区分，后续核对针对修订版本。
+
 ## 本地 Shell 增强（2026-10-03）
 
 在 Windows PowerShell 5.1.26100.9444 + PSReadLine 2.0.0 上执行 `tests/test_work_shell.ps1`：30 个断言，exit 0。覆盖键位与 RGB 选区、单行提示符、退出码保留、不重复写入、中文/空格目录恢复、真实 zoxide/zi 与 fzf、选中只插入、取消保留输入、过滤多行历史、工具缺失时基础 Shell 可用。历史编辑器状态使用合成适配器；实际 fzf/zoxide 使用独立 D 盘数据，没有读取用户历史或真实目录数据库。
