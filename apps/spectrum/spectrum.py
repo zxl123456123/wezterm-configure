@@ -50,6 +50,9 @@ class SpectrumState:
         self.last_render = float('-inf')
         self.last_step = None
         self.size = None
+        self._hann = np.empty(0)
+        self._band_key = None
+        self._band_indices = np.empty(0, dtype=int)
 
     def capture(self, samples):
         samples = np.asarray(samples)
@@ -77,9 +80,15 @@ class SpectrumState:
         self.peaks = np.maximum(self.levels, self.peaks - elapsed * 2.8)
         self.amount *= np.exp(-elapsed * 2.5)
         if active and bars and rows and self.window.size >= 2:
-            spectrum = np.abs(np.fft.rfft(self.window * np.hanning(len(self.window)))) / len(self.window)
-            edges = np.geomspace(45, 16000, bars + 1)
-            indices = np.clip((edges * len(self.window) / RATE).astype(int), 1, len(spectrum) - 1)
+            n = len(self.window)
+            if self._hann.size != n:
+                self._hann = np.hanning(n)
+            spectrum = np.abs(np.fft.rfft(self.window * self._hann)) / n
+            if self._band_key != (n, bars):
+                edges = np.geomspace(45, 16000, bars + 1)
+                self._band_indices = np.clip((edges * n / RATE).astype(int), 1, len(spectrum) - 1)
+                self._band_key = (n, bars)
+            indices = self._band_indices
             values = np.array([spectrum[indices[i]:max(indices[i] + 1, indices[i + 1])].max()
                                for i in range(bars)])
             self.reference = max(0.0015, values.max() * 1.6, self.reference * 0.985)

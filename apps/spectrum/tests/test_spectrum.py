@@ -7,6 +7,7 @@ import types
 import tempfile
 import unittest
 import warnings
+from contextlib import ExitStack, contextmanager
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -219,6 +220,206 @@ class MainLoopTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'fake device failed'):
             spectrum.main(recorder, output=output, should_run=lambda: True)
         self.assertTrue(output.getvalue().endswith('\x1b[0m\x1b[?25h\x1b[?1049l'))
+
+
+# Frozen from e498739897881d4a117810020de0233a2b9f7beb frame, before fixed-data reuse.
+# Keep this oracle independent of the cache; changes require an algorithm contract review.
+def original_frame(self, now, size):
+    energy = float(np.sqrt(np.mean(self.window ** 2))) if self.window.size else 0.0
+    active = energy > 0.0001
+    resized = size != self.size
+    moving = self.amount > 0 or np.any(self.peaks)
+    if not resized and (not active and not moving):
+        return None
+    if not resized and now - self.last_render < (0.05 if active else 0.25) - 1e-9:
+        return None
+    elapsed = min(1.0, now - self.last_step) if self.last_step is not None else 0.05
+    self.last_step = self.last_render = now
+    self.size = size
+    _, _, bars, rows = spectrum.geometry(*size)
+    self.levels *= np.exp(-elapsed * 5)
+    self.peaks = np.maximum(self.levels, self.peaks - elapsed * 2.8)
+    self.amount *= np.exp(-elapsed * 2.5)
+    if active and bars and rows and self.window.size >= 2:
+        values_spectrum = np.abs(np.fft.rfft(self.window * np.hanning(len(self.window)))) / len(self.window)
+        edges = np.geomspace(45, 16000, bars + 1)
+        indices = np.clip((edges * len(self.window) / spectrum.RATE).astype(int), 1, len(values_spectrum) - 1)
+        values = np.array([values_spectrum[indices[i]:max(indices[i] + 1, indices[i + 1])].max()
+                           for i in range(bars)])
+        self.reference = max(0.0015, values.max() * 1.6, self.reference * 0.985)
+        levels = np.clip((values / self.reference) ** 0.6 * rows, 0, rows)
+        self.levels[:bars] = np.maximum(levels, self.levels[:bars])
+        self.peaks[:bars] = np.maximum(self.levels[:bars], self.peaks[:bars])
+        self.amount = max(self.amount, min(1.0, energy * 12))
+    self.levels[self.levels < 0.025] = 0
+    self.peaks[self.peaks < 0.025] = 0
+    if self.amount < 0.015:
+        self.amount = 0
+    return spectrum.render_frame(self, *size, now, active, resized)
+
+
+@contextmanager
+def count_calls():
+    # Closures retain only scalar counts and original callables, never array arguments.
+    counts = dict.fromkeys(('hanning', 'geomspace', 'rfft', 'mean', 'render_frame', 'sin', 'cos'), 0)
+    with ExitStack() as stack:
+        for owner, name in [(np, 'hanning'), (np, 'geomspace'), (np.fft, 'rfft'),
+                            (np, 'mean'), (spectrum, 'render_frame'), (np, 'sin'), (np, 'cos')]:
+            original = getattr(owner, name)
+
+            def counted(*args, _original=original, _name=name, **kwargs):
+                counts[_name] += 1
+                return _original(*args, **kwargs)
+
+            stack.enter_context(patch.object(owner, name, counted))
+        yield counts
+
+
+class FixedDataTests(unittest.TestCase):
+    def assert_state(self, actual, expected):
+        for name in ('window', 'levels', 'peaks'):
+            np.testing.assert_array_equal(getattr(actual, name), getattr(expected, name))
+        for name in ('reference', 'amount', 'last_render', 'last_step', 'size'):
+            self.assertEqual(getattr(actual, name), getattr(expected, name), name)
+        self.assertIsNot(actual.window, expected.window)
+        self.assertIsNot(actual.levels, expected.levels)
+        self.assertIsNot(actual.peaks, expected.peaks)
+
+    def compare_frame(self, actual, expected, now, size):
+        result = actual.frame(now, size)
+        self.assertEqual(result, original_frame(expected, now, size))
+        self.assert_state(actual, expected)
+        return result
+
+    def test_frame_oracle_continuous_capture_and_gates(self):
+        actual, expected = spectrum.SpectrumState(), spectrum.SpectrumState()
+        sizes = [(60, 5), (120, 8), (237, 8), (1, 1), (12, 4)]
+        for index in range(80):
+            length = [0, 1, 2, 3, 127, 128, 2047, 2048, 5000][index % 9]
+            samples = np.sin(np.arange(length) * (0.1 + index * 0.01)) * 0.1
+            if index % 3 == 0:
+                samples = np.column_stack((samples, samples * 0.5))
+            for state in (actual, expected):
+                state.capture(samples)
+            size = sizes[index % len(sizes)]
+            self.compare_frame(actual, expected, index * 0.05, size)
+            self.compare_frame(actual, expected, index * 0.05 + 0.001, size)
+
+    def test_fixed_200_varying_frames_exact_and_one_construction(self):
+        actual, expected = spectrum.SpectrumState(), spectrum.SpectrumState()
+        chunks = [np.sin(np.arange(2048) * (0.05 + index * 0.001)) * (0.03 + index % 7 * 0.01)
+                  for index in range(200)]
+        counts = dict.fromkeys(('hanning', 'geomspace', 'rfft', 'render_frame'), 0)
+        rendered = 0
+        for index, chunk in enumerate(chunks):
+            actual.capture(chunk)
+            expected.capture(chunk)
+            with count_calls() as frame_counts:
+                frame = actual.frame(index * 0.05, (120, 8))
+            rendered += frame is not None
+            for name in counts:
+                counts[name] += frame_counts[name]
+            self.assertEqual(frame, original_frame(expected, index * 0.05, (120, 8)))
+            self.assert_state(actual, expected)
+        self.assertEqual(rendered, 200)
+        self.assertEqual(counts,
+                         {'hanning': 1, 'geomspace': 1, 'rfft': 200, 'render_frame': 200})
+        np.testing.assert_array_equal(actual._hann, np.hanning(2048))
+        print('FIXED frames=200 rfft=200 hanning=1 geomspace=1; raw ANSI/state exact')
+
+    def test_lengths_stereo_bounded_and_current_key_replacement(self):
+        actual, expected = spectrum.SpectrumState(), spectrum.SpectrumState()
+        hann_n, band_key = None, None
+        for index, length in enumerate([0, 1, 2, 2, 3, 127, 128, 128, 2047, 2048, 2048, 2, 127, 4096]):
+            mono = np.linspace(0.02, 0.1, length)
+            samples = np.column_stack((mono, mono * 0.5)) if index % 2 else mono
+            for state in (actual, expected):
+                state.capture(np.empty(0))
+                state.capture(samples)
+            n = min(length, 2048)
+            bars = spectrum.geometry(120, 8)[2]
+            eligible = n >= 2
+            old_hann = getattr(actual, '_hann', None)
+            old_indices = getattr(actual, '_band_indices', None)
+            with count_calls() as counts:
+                result = actual.frame(index * 0.05, (120, 8))
+            self.assertEqual(result, original_frame(expected, index * 0.05, (120, 8)))
+            self.assert_state(actual, expected)
+            self.assertEqual(counts['hanning'], int(eligible and hann_n != n))
+            self.assertEqual(counts['geomspace'], int(eligible and band_key != (n, bars)))
+            self.assertEqual(counts['rfft'], int(eligible))
+            if eligible:
+                if hann_n == n:
+                    self.assertIs(actual._hann, old_hann)
+                if band_key == (n, bars):
+                    self.assertIs(actual._band_indices, old_indices)
+                hann_n, band_key = n, (n, bars)
+                np.testing.assert_array_equal(actual._hann, np.hanning(n))
+                edges = np.geomspace(45, 16000, bars + 1)
+                np.testing.assert_array_equal(actual._band_indices, np.clip(
+                    (edges * n / spectrum.RATE).astype(int), 1, n // 2))
+        self.assertLessEqual(actual.window.size, 2048)
+
+    def test_resize_with_same_bars_height_and_tiny_geometry(self):
+        actual, expected = spectrum.SpectrumState(), spectrum.SpectrumState()
+        for state in (actual, expected):
+            state.capture(np.ones(2048) * 0.1)
+        key = None
+        for index, size in enumerate([(120, 8), (120, 9), (121, 9), (60, 5), (237, 8),
+                                     (1, 1), (12, 0), (12, 4), (120, 8)]):
+            bars, rows = spectrum.geometry(*size)[2:]
+            eligible = bool(bars and rows)
+            with count_calls() as counts:
+                result = actual.frame(index * 0.001, size)
+            self.assertEqual(result, original_frame(expected, index * 0.001, size))
+            self.assert_state(actual, expected)
+            self.assertIn('\x1b[2J', result)
+            self.assertEqual(counts['hanning'], int(index == 0))
+            self.assertEqual(counts['geomspace'], int(eligible and key != (2048, bars)))
+            self.assertEqual(counts['rfft'], int(eligible))
+            if eligible:
+                key = (2048, bars)
+        self.assertEqual(spectrum.geometry(120, 9)[2], spectrum.geometry(121, 9)[2])
+
+    def test_silence_empty_decay_idle_and_wakeup_exact(self):
+        for empty in (False, True):
+            with self.subTest(empty=empty):
+                actual, expected = spectrum.SpectrumState(), spectrum.SpectrumState()
+                for state in (actual, expected):
+                    state.capture(np.ones(2048) * 0.1)
+                self.compare_frame(actual, expected, 0, (120, 8))
+                with count_calls() as counts:
+                    self.assertIsNone(actual.frame(0.01, (120, 8)))
+                self.assertEqual(counts['rfft'], 0)
+                self.assertIsNone(original_frame(expected, 0.01, (120, 8)))
+                self.assert_state(actual, expected)
+                for state in (actual, expected):
+                    state.capture(np.empty(0) if empty else np.zeros(2048))
+                for index in range(1, 121):
+                    with count_calls() as counts:
+                        result = actual.frame(index * 0.05, (120, 8))
+                    self.assertEqual(result, original_frame(expected, index * 0.05, (120, 8)))
+                    self.assert_state(actual, expected)
+                    self.assertEqual((counts['hanning'], counts['geomspace'], counts['rfft']), (0, 0, 0))
+                self.assertEqual(actual.amount, 0)
+                self.assertFalse(np.any(actual.peaks))
+                self.compare_frame(actual, expected, 6.01, (60, 5))
+                self.compare_frame(actual, expected, 6.02, (120, 8))
+                with count_calls() as counts:
+                    for index in range(1000):
+                        self.assertIsNone(actual.frame(7 + index * 0.01, (120, 8)))
+                self.assertEqual(counts, {'hanning': 0, 'geomspace': 0, 'rfft': 0,
+                                         'mean': 0 if empty else 1000, 'render_frame': 0, 'sin': 0, 'cos': 0})
+                for index in range(1000):
+                    self.assertIsNone(original_frame(expected, 7 + index * 0.01, (120, 8)))
+                self.assert_state(actual, expected)
+                for state in (actual, expected):
+                    state.capture(np.ones(2048) * 0.08)
+                with count_calls() as counts:
+                    result = actual.frame(18, (120, 8))
+                self.assertEqual((counts['hanning'], counts['geomspace'], counts['rfft']), (0, 0, 1))
+                self.assertEqual(result, original_frame(expected, 18, (120, 8)))
+                self.assert_state(actual, expected)
 
 
 if __name__ == '__main__':
