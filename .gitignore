@@ -43,3 +43,11 @@ target/
 *.ttf
 *.otf
 *.woff*
+
+# Keep raw local planning material private; publish only sanitized archive evidence.
+/docs/archive/2026-10-03/workbench-refinements-20261003/*
+!/docs/archive/2026-10-03/workbench-refinements-20261003/SUMMARY.md
+!/docs/archive/2026-10-03/workbench-refinements-20261003/impl_report_r1.md
+!/docs/archive/2026-10-03/workbench-refinements-20261003/impl_report_r2.md
+!/docs/archive/2026-10-03/workbench-refinements-20261003/review_notes_impl_r1_1.md
+!/docs/archive/2026-10-03/workbench-refinements-20261003/review_notes_impl_r2_1.md

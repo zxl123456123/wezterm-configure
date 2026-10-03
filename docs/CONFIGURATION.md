@@ -2,6 +2,17 @@
 
 本页说明当前实际配置入口和选择理由；快捷键与安装流程分别见 [USAGE](USAGE.md)、[INSTALL](INSTALL.md)。不直接修改全局 Windows Terminal 或其他 WezTerm 窗口的配置。
 
+## 架构边界与优化取舍
+
+本页是当前架构与配置决策入口，历史方案和分轮证据仅供回顾。
+
+- ✅ 已实现：Zellij 管理主标签与面板，WezTerm 管理终端外观；Control 通过既有后端调用 GlazeWM，不能把平铺工作区直接当作 Windows 虚拟桌面或固定显示器。
+- ✅ 已实现：Control 使用 Textual 原有样式机制适应窄窗，而不扩成横向滚动的大画布；尺寸变化不重建控件或额外查询后端，以保留拖动、刷新和身份的边界。
+- ✅ 已实现：Spectrum 仅复用参数固定的数据，每个状态保留当前数组，不保存历史尺寸缓存或 FFT 结果；新的音频仍逐帧计算，以保持输出等价而不牺牲动效。
+- ⛔ 未实现：自动安装、音频设备恢复、按标签可见性自动挂起后台。没有为本轮局部优化增加框架、依赖或常驻服务；Monitor 保持 1 秒采样。
+
+源码更新只在新应用进程加载；现用会话与真实音频不由离线验证替代。历史决策及交付证据见[优化归档摘要](archive/2026-10-03/workbench-refinements-20261003/SUMMARY.md)，功能细节见下文，验证边界见 [VERIFICATION](VERIFICATION.md)。
+
 ## WezTerm 外观
 
 入口：`config/wezterm/wezterm.lua` 与 `appearance.json`。
