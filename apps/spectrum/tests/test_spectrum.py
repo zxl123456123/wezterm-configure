@@ -92,6 +92,104 @@ class GeometryTests(unittest.TestCase):
         self.assertEqual(spectrum.geometry(237, 8)[1], 24)
 
 
+class ContinuityTests(unittest.TestCase):
+    def test_short_empty_gap_keeps_window_and_does_not_draw_idle(self):
+        state = spectrum.SpectrumState()
+        tone = np.sin(np.arange(2048) * 0.1) * 0.1
+        state.capture(tone)
+        state.frame(0, (172, 6))
+        state.capture(np.empty((0, 2)))
+        with count_calls() as counts:
+            self.assertIsNone(state.frame(0.06, (172, 6)))
+            self.assertIsNone(state.frame(0.12, (172, 6)))
+        np.testing.assert_array_equal(state.window, tone)
+        self.assertEqual(counts['rfft'], 0)
+        self.assertEqual(counts['render_frame'], 0)
+        next_chunk = np.full(441, 0.02)
+        state.capture(next_chunk)
+        np.testing.assert_array_equal(state.window, np.concatenate((tone, next_chunk))[-2048:])
+        self.assertIn('SYSTEM AUDIO', state.frame(0.13, (172, 6)))
+
+    def test_long_empty_gap_expires_then_restarts_without_old_audio(self):
+        state = spectrum.SpectrumState()
+        state.capture(np.ones(2048) * 0.1)
+        state.frame(0, (172, 6))
+        state.capture(np.empty(0))
+        state.frame(0.01, (172, 6))
+        self.assertEqual(state.window.size, 2048)
+        state.frame(0.16, (172, 6))
+        self.assertEqual(state.window.size, 0)
+        for index in range(1, 81):
+            state.capture(np.empty(0))
+            state.frame(0.16 + index * 0.25, (172, 6))
+        self.assertEqual(state.amount, 0)
+        self.assertFalse(np.any(state.peaks))
+        state.capture(np.full(441, 0.03))
+        np.testing.assert_array_equal(state.window, np.full(441, 0.03))
+        self.assertIn('SYSTEM AUDIO', state.frame(21, (172, 6)))
+
+    def test_empty_idle_stays_settled_without_fft_or_output(self):
+        _, _, _, state = exercise([np.ones(2048) * 0.1] * 30 + [np.empty(0)] * 1000)
+        with count_calls() as counts:
+            for index in range(1000):
+                state.capture(np.empty(0))
+                self.assertIsNone(state.frame(20 + index * 0.01, (100, 8)))
+        self.assertEqual(counts, dict.fromkeys(counts, 0))
+        self.assertEqual(state.window.size, 0)
+
+    def test_delayed_capture_after_gap_discards_expired_history(self):
+        state = spectrum.SpectrumState()
+        state.capture(np.ones(2048) * 0.1, now=0)
+        state.frame(0, (172, 6))
+        state.capture(np.empty(0), now=0.01)
+        state.frame(0.01, (172, 6))
+        state.capture(np.full(441, 0.03), now=0.21)
+        np.testing.assert_array_equal(state.window, np.full(441, 0.03))
+
+    def test_gap_age_starts_at_capture_not_delayed_draw(self):
+        state = spectrum.SpectrumState()
+        state.capture(np.ones(2048) * 0.1, now=0)
+        state.frame(0, (172, 6))
+        state.capture(np.empty(0), now=0.01)
+        state.frame(0.11, (172, 6))
+        state.capture(np.full(441, 0.03), now=0.18)
+        np.testing.assert_array_equal(state.window, np.full(441, 0.03))
+
+    def test_resize_during_short_gap_only_redraws_cached_heights(self):
+        state = spectrum.SpectrumState()
+        state.capture(np.sin(np.arange(2048) * 0.1) * 0.1)
+        state.frame(0, (172, 12))
+        previous = state.levels.copy()
+        state.capture(np.empty(0))
+        with count_calls() as counts:
+            frame = state.frame(0.01, (172, 6))
+        self.assertIn('\x1b[2J', frame)
+        self.assertEqual(counts['rfft'], 0)
+        self.assertEqual(counts['render_frame'], 1)
+        bars = spectrum.geometry(172, 6)[2]
+        expected = previous[:bars] * 5 / 11 * np.exp(-0.01 * 5)
+        expected[expected < 0.025] = 0
+        np.testing.assert_allclose(state.levels[:bars], expected)
+
+    def test_resize_scales_heights_and_clears_hidden_bands(self):
+        state = spectrum.SpectrumState()
+        state.frame(0, (172, 12))
+        state.levels[:] = 8.8
+        state.peaks[:] = 9.9
+        frame = state.frame(0, (172, 6))
+        _, _, bars, rows = spectrum.geometry(172, 6)
+        np.testing.assert_allclose(state.levels[:bars], 4.0)
+        np.testing.assert_allclose(state.peaks[:bars], 4.5)
+        self.assertTrue(np.all(state.levels <= rows))
+        self.assertTrue(np.all(state.peaks <= rows))
+        self.assertFalse(np.any(state.levels[bars:]))
+        self.assertFalse(np.any(state.peaks[bars:]))
+        self.assertIn('\x1b[2J', frame)
+        state.frame(0, (12, 0))
+        self.assertFalse(np.any(state.levels))
+        self.assertFalse(np.any(state.peaks))
+
+
 class MainLoopTests(unittest.TestCase):
     def test_empty_and_latest_bounded_window(self):
         _, recorder, output, state = exercise([np.empty((0, 2)), np.ones((3000, 2)),
@@ -108,8 +206,8 @@ class MainLoopTests(unittest.TestCase):
         sizes = []
         original_capture = state.capture
 
-        def capture(samples):
-            result = original_capture(samples)
+        def capture(samples, **kwargs):
+            result = original_capture(samples, **kwargs)
             sizes.append(state.window.size)
             return result
 
@@ -292,18 +390,18 @@ class FixedDataTests(unittest.TestCase):
         return result
 
     def test_frame_oracle_continuous_capture_and_gates(self):
-        actual, expected = spectrum.SpectrumState(), spectrum.SpectrumState()
-        sizes = [(60, 5), (120, 8), (237, 8), (1, 1), (12, 4)]
-        for index in range(80):
-            length = [0, 1, 2, 3, 127, 128, 2047, 2048, 5000][index % 9]
-            samples = np.sin(np.arange(length) * (0.1 + index * 0.01)) * 0.1
-            if index % 3 == 0:
-                samples = np.column_stack((samples, samples * 0.5))
-            for state in (actual, expected):
-                state.capture(samples)
-            size = sizes[index % len(sizes)]
-            self.compare_frame(actual, expected, index * 0.05, size)
-            self.compare_frame(actual, expected, index * 0.05 + 0.001, size)
+        # Resize and missing packets now have their own corrected contracts.
+        for size in [(60, 5), (120, 8), (237, 8), (1, 1), (12, 4)]:
+            actual, expected = spectrum.SpectrumState(), spectrum.SpectrumState()
+            for index in range(80):
+                length = [1, 2, 3, 127, 128, 2047, 2048, 5000][index % 8]
+                samples = np.sin(np.arange(length) * (0.1 + index * 0.01)) * 0.1
+                if index % 3 == 0:
+                    samples = np.column_stack((samples, samples * 0.5))
+                for state in (actual, expected):
+                    state.capture(samples)
+                self.compare_frame(actual, expected, index * 0.05, size)
+                self.compare_frame(actual, expected, index * 0.05 + 0.001, size)
 
     def test_fixed_200_varying_frames_exact_and_one_construction(self):
         actual, expected = spectrum.SpectrumState(), spectrum.SpectrumState()
@@ -334,6 +432,8 @@ class FixedDataTests(unittest.TestCase):
             mono = np.linspace(0.02, 0.1, length)
             samples = np.column_stack((mono, mono * 0.5)) if index % 2 else mono
             for state in (actual, expected):
+                # Isolate FFT lengths; an empty device packet no longer resets history.
+                state.window = np.empty(0)
                 state.capture(np.empty(0))
                 state.capture(samples)
             n = min(length, 2048)
@@ -371,8 +471,13 @@ class FixedDataTests(unittest.TestCase):
             eligible = bool(bars and rows)
             with count_calls() as counts:
                 result = actual.frame(index * 0.001, size)
-            self.assertEqual(result, original_frame(expected, index * 0.001, size))
-            self.assert_state(actual, expected)
+            self.assertTrue(np.all(actual.levels <= rows))
+            self.assertTrue(np.all(actual.peaks <= rows))
+            self.assertFalse(np.any(actual.levels[bars:]))
+            self.assertFalse(np.any(actual.peaks[bars:]))
+            lines = [ANSI.sub('', line) for line in re.split(r'\x1b\[\d+;1H', result)[1:]]
+            self.assertLessEqual(len(lines), size[1])
+            self.assertTrue(all(len(line) <= size[0] - 1 for line in lines))
             self.assertIn('\x1b[2J', result)
             self.assertEqual(counts['hanning'], int(index == 0))
             self.assertEqual(counts['geomspace'], int(eligible and key != (2048, bars)))
@@ -381,8 +486,9 @@ class FixedDataTests(unittest.TestCase):
                 key = (2048, bars)
         self.assertEqual(spectrum.geometry(120, 9)[2], spectrum.geometry(121, 9)[2])
 
-    def test_silence_empty_decay_idle_and_wakeup_exact(self):
-        for empty in (False, True):
+    def test_real_silence_decay_idle_and_wakeup_exact(self):
+        # Empty-packet expiration is checked independently in ContinuityTests/main.
+        for empty in (False,):
             with self.subTest(empty=empty):
                 actual, expected = spectrum.SpectrumState(), spectrum.SpectrumState()
                 for state in (actual, expected):

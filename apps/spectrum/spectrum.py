@@ -53,20 +53,36 @@ class SpectrumState:
         self._hann = np.empty(0)
         self._band_key = None
         self._band_indices = np.empty(0, dtype=int)
+        self._empty_packet = False
+        self._gap_since = None
 
-    def capture(self, samples):
+    def capture(self, samples, now=None):
         samples = np.asarray(samples)
+        self._empty_packet = not samples.size
         if not samples.size:
-            self.window = np.empty(0)
+            if self.window.size and self._gap_since is None and now is not None:
+                self._gap_since = now
             return False
+        if now is not None and self._gap_since is not None and now - self._gap_since >= 0.15:
+            self.window = np.empty(0)
+        self._gap_since = None
         mono = samples.mean(axis=1) if samples.ndim == 2 else samples
         self.window = np.concatenate((self.window, mono[-FRAMES:]))[-FRAMES:]
         return True
 
     def frame(self, now, size):
+        resized = size != self.size
+        if self._empty_packet and self.window.size:
+            if self._gap_since is None:
+                self._gap_since = now
+            # Available-data reads can briefly return no packet, not silence.
+            if now - self._gap_since < 0.15:
+                if not resized:
+                    return None
+            else:
+                self.window = np.empty(0)
         energy = float(np.sqrt(np.mean(self.window ** 2))) if self.window.size else 0.0
         active = energy > 0.0001
-        resized = size != self.size
         moving = self.amount > 0 or np.any(self.peaks)
         if not resized and (not active and not moving):
             return None
@@ -74,12 +90,18 @@ class SpectrumState:
             return None
         elapsed = min(1.0, now - self.last_step) if self.last_step is not None else 0.05
         self.last_step = self.last_render = now
-        self.size = size
         _, _, bars, rows = geometry(*size)
+        if resized and self.size is not None:
+            old_rows = geometry(*self.size)[3]
+            scale = rows / old_rows if old_rows else 0
+            self.levels = np.clip(self.levels * scale, 0, rows)
+            self.peaks = np.clip(self.peaks * scale, 0, rows)
+            self.levels[bars:] = self.peaks[bars:] = 0
+        self.size = size
         self.levels *= np.exp(-elapsed * 5)
         self.peaks = np.maximum(self.levels, self.peaks - elapsed * 2.8)
         self.amount *= np.exp(-elapsed * 2.5)
-        if active and bars and rows and self.window.size >= 2:
+        if active and not self._empty_packet and bars and rows and self.window.size >= 2:
             n = len(self.window)
             if self._hann.size != n:
                 self._hann = np.hanning(n)
@@ -182,7 +204,8 @@ def main(recorder=None, *, clock=time.monotonic, size=os.get_terminal_size,
             warnings.showwarning = showwarning
             try:
                 while should_run():
-                    if not state.capture(recorder.record(numframes=None)):
+                    samples = recorder.record(numframes=None)
+                    if not state.capture(samples, now=clock()):
                         sleep(0.005)
                     frame = state.frame(clock(), size())
                     if frame is not None:
