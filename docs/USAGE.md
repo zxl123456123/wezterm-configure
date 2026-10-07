@@ -74,6 +74,8 @@ SSH 不会自动把本机图片剪贴板传到远端。需要图片时手动 `sc
 
 ## Control 与背景
 
+使用既有 Control 恢复入口（`D:\terminal-workbench\apps\spectrum-venv\Scripts\python.exe D:\terminal-workbench\apps\control-center\control_center.py control`）：缺少标签时创建原布局；唯一且已退出并保留的 Control，在原位置请求恢复；仍运行时切换过去。恢复只接受配置规定的 Python 控制页或已观察的 GlazeWM 工作区子查询，身份不明、重复或状态变化会拒绝。原位恢复保留其他面板及标签顺序，不重新启动 GlazeWM；离线提示表示窗口管理器尚未运行。恢复请求成功不等于程序已就绪，原退出面板的滚屏会被替换。
+
 GlazeWM 运行时：点击程序卡片聚焦窗口，把程序拖到另一工作区卡片移动。卡片同时标注工作区和显示器；**一个显示器可以对应多个工作区**，不是四个固定显示器，也不是 Windows 虚拟桌面。
 
 `R` 手动刷新。默认 8 秒检查变化；操作后的刷新请求合并；拖动过程中不重建卡片，结束后补刷。GlazeWM 未运行时显示离线提示，不影响使用其他终端标签。

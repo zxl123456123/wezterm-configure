@@ -1,5 +1,8 @@
 """Local workbench controller: WezTerm appearance and GlazeWM windows."""
 
+import ctypes
+from ctypes import wintypes
+from contextlib import contextmanager
 import json
 import mimetypes
 import msvcrt
@@ -25,6 +28,8 @@ MUSIC_LAYOUT = ROOT / 'config' / 'zellij' / 'layouts' / 'music.kdl'
 MUSIC_PLAYER = ROOT / 'apps' / 'cnmplayer' / 'cnmplayer.exe'
 MUSIC_RESTORE_LOCK = ROOT / 'data' / 'music-restore.lock'
 CONTROL_LAYOUT = ROOT / 'config' / 'zellij' / 'layouts' / 'control.kdl'
+CONTROL_PYTHON = ROOT / 'apps' / 'spectrum-venv' / 'Scripts' / 'python.exe'
+CONTROL_TUI = ROOT / 'apps' / 'control-center' / 'control_tui.py'
 SESSION = 'workbench-v4'
 PORT = 8765
 URL = f'http://127.0.0.1:{PORT}/'
@@ -147,6 +152,60 @@ def run_glaze(action, window_id, workspace=None):
     if not payload.get('success'):
         raise RuntimeError(str(payload.get('error') or 'GlazeWM command failed'))
     return payload.get('data') or 'Done'
+
+
+@contextmanager
+def _workbench_tabs_lock():
+    kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+    kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, wintypes.BOOL, wintypes.LPCWSTR]
+    kernel32.CreateMutexW.restype = wintypes.HANDLE
+    kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    kernel32.WaitForSingleObject.restype = wintypes.DWORD
+    kernel32.ReleaseMutex.argtypes = [wintypes.HANDLE]
+    kernel32.ReleaseMutex.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+
+    handle = kernel32.CreateMutexW(None, False, r'Local\TerminalWorkbench.Tabs.workbench-v4')
+    if not handle:
+        raise ctypes.WinError(ctypes.get_last_error())
+    owned = False
+    try:
+        status = kernel32.WaitForSingleObject(handle, 30000)
+        if status in (0, 0x80):
+            # Both normal and abandoned acquisition give this thread ownership.
+            owned = True
+        elif status == 0x102:
+            raise RuntimeError('Workbench tab lock wait timed out after 30000ms; try again shortly.')
+        elif status == 0xFFFFFFFF:
+            raise ctypes.WinError(ctypes.get_last_error())
+        else:
+            raise RuntimeError(f'Unexpected workbench tab lock wait result: {status}')
+        yield
+    finally:
+        primary_error = sys.exc_info()[1]
+        cleanup_error = None
+        if owned:
+            try:
+                if not kernel32.ReleaseMutex(handle):
+                    raise ctypes.WinError(ctypes.get_last_error())
+            except BaseException as exc:
+                cleanup_error = exc
+        # Closing the handle is independent of releasing this thread's ownership.
+        try:
+            if not kernel32.CloseHandle(handle):
+                raise ctypes.WinError(ctypes.get_last_error())
+        except BaseException as exc:
+            if cleanup_error is None:
+                cleanup_error = exc
+        if cleanup_error is not None:
+            if primary_error is None:
+                raise cleanup_error
+            try:
+                print(f'Workbench tab lock cleanup failed: {cleanup_error}', file=sys.stderr)
+            except Exception:
+                pass
+
 
 
 def restore_tab(name, layout):
@@ -291,8 +350,117 @@ def _restore_music_locked():
     return 'Music Player restored in its existing pane.'
 
 
+def _restore_control_locked():
+    env = os.environ.copy()
+    env['ZELLIJ_CONFIG_DIR'] = str(ROOT / 'config' / 'zellij')
+    env['CNMPLAYER_ASSET_DIR'] = str(ROOT / 'data' / 'cnmplayer')
+
+    def run_action(args, timeout=5):
+        result = subprocess.run([str(ZELLIJ), '--session', SESSION, 'action', *args],
+                                capture_output=True, text=True, encoding='utf-8',
+                                errors='replace', env=env, timeout=timeout)
+        if result.returncode:
+            raise RuntimeError(result.stderr.strip() or result.stdout.strip()
+                               or f'Control restore command failed: {args[0]}')
+        return result.stdout
+
+    def query(args):
+        try:
+            records = json.loads(run_action(args))
+        except ValueError as exc:
+            raise RuntimeError(f'Invalid JSON from {args[0]}') from exc
+        if not isinstance(records, list) or any(not isinstance(item, dict) for item in records):
+            raise RuntimeError(f'Invalid state from {args[0]}')
+        return records
+
+    def control_state():
+        tabs = query(['list-tabs', '--json'])
+        panes = query(['list-panes', '--all', '--json'])
+        matches = [tab for tab in tabs if tab.get('name') == 'Control']
+        if not matches:
+            if any(pane.get('tab_name') == 'Control' for pane in panes):
+                raise RuntimeError('Control panes have no tab; no pane was changed.')
+            return None
+        if len(matches) != 1:
+            raise RuntimeError('Control tab is ambiguous; no pane was changed.')
+        tab = matches[0]
+        if (any(type(tab.get(key)) is not int or tab[key] < 0
+                for key in ('tab_id', 'position')) or type(tab.get('active')) is not bool):
+            raise RuntimeError('Control tab identity is invalid; no pane was changed.')
+        if any(other is not tab and (other.get('tab_id') == tab['tab_id']
+                                    or other.get('position') == tab['position']) for other in tabs):
+            raise RuntimeError('Control tab identity is aliased; no pane was changed.')
+        related = [pane for pane in panes if pane.get('tab_id') == tab['tab_id']
+                   or pane.get('tab_name') == 'Control']
+        for pane in related:
+            if (type(pane.get('tab_id')) is not int or pane['tab_id'] != tab['tab_id']
+                    or type(pane.get('tab_position')) is not int
+                    or pane['tab_position'] != tab['position'] or pane.get('tab_name') != 'Control'
+                    or type(pane.get('is_plugin')) is not bool
+                    or (pane['is_plugin'] and pane.get('title') == 'Control')):
+                raise RuntimeError('Control pane ownership is invalid; no pane was changed.')
+        terminals = [pane for pane in related if pane['is_plugin'] is False]
+        if len(terminals) != 1 or terminals[0].get('title') != 'Control':
+            raise RuntimeError('Control needs exactly one terminal Control pane; no pane was changed.')
+        pane = terminals[0]
+        if (any(type(pane.get(key)) is not int or pane[key] < 0
+                for key in ('id', 'tab_id', 'tab_position', 'pane_x', 'pane_y',
+                            'pane_rows', 'pane_columns'))
+                or pane['pane_rows'] == 0 or pane['pane_columns'] == 0
+                or any(type(pane.get(key)) is not bool for key in
+                       ('exited', 'is_held', 'is_floating', 'is_suppressed'))
+                or pane['is_floating'] or pane['is_suppressed']):
+            raise RuntimeError('Control pane identity or state is invalid; no pane was changed.')
+        if sum(other.get('is_plugin') is False and other.get('id') == pane['id']
+               for other in panes) != 1:
+            raise RuntimeError('Control terminal identity is duplicated; no pane was changed.')
+        status = pane.get('exit_status')
+        command = pane.get('terminal_command')
+        if ((status is not None and type(status) is not int)
+                or (command is not None and not isinstance(command, str))
+                or (pane['exited'] and (not pane['is_held'] or type(status) is not int or status < 0))):
+            raise RuntimeError('Control exit state or command is invalid; no pane was changed.')
+        return (tab['tab_id'], tab['position'], tab['name'], tab['active'],
+                pane['id'], pane['tab_id'], pane['tab_position'], pane['tab_name'],
+                pane['title'], pane['is_plugin'], pane['exited'], pane['is_held'],
+                pane['is_floating'], pane['is_suppressed'], status, command,
+                pane['pane_x'], pane['pane_y'], pane['pane_rows'], pane['pane_columns'])
+
+    state = control_state()
+    if control_state() != state:
+        raise RuntimeError('Control state changed during restore; no pane was changed.')
+    if state is None:
+        run_action(['new-tab', '--layout', str(CONTROL_LAYOUT), '--name', 'Control'], timeout=10)
+        reveal_terminal()
+        return 'Control tab restored.'
+    position, pane_id, exited, command = state[1], state[4], state[10], state[15]
+    if not exited:
+        run_action(['go-to-tab', str(position + 1)])
+        reveal_terminal()
+        return 'Control tab already exists; switched to it.'
+
+    # Fixed display forms only; no shell parsing or command normalization.
+    def path_forms(path):
+        plain = str(path)
+        displayed = plain.replace('\\', '\\\\')
+        return (plain, '"' + plain + '"', displayed, '"' + displayed + '"')
+
+    allowed = {python + ' ' + tui for python in path_forms(CONTROL_PYTHON)
+               for tui in path_forms(CONTROL_TUI)}
+    allowed.update(glaze + ' query workspaces' for glaze in path_forms(GLAZE))
+    if command not in allowed:
+        raise RuntimeError('Control command is unknown; no pane was changed.')
+    if not CONTROL_PYTHON.is_file() or not CONTROL_TUI.is_file():
+        raise RuntimeError('Control executable or TUI is missing; no pane was changed.')
+    run_action(['new-pane', '--in-place', '--close-replaced-pane', '--pane-id',
+                f'terminal_{pane_id}', '--no-focus', '--name', 'Control', '--',
+                str(CONTROL_PYTHON), str(CONTROL_TUI)], timeout=10)
+    return 'Control restore requested in its existing pane.'
+
+
 def restore_control():
-    return restore_tab('Control', CONTROL_LAYOUT)
+    with _workbench_tabs_lock():
+        return _restore_control_locked()
 
 
 class Handler(BaseHTTPRequestHandler):
