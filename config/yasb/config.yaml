@@ -13,7 +13,7 @@ bars:
       width: '100%'
       height: 36
     window_flags:
-      always_on_top: true
+      always_on_top: false
       windows_app_bar: true
     widgets:
       left: ['quick_launch', 'glazewm_workspaces']
