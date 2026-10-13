@@ -89,6 +89,12 @@ config.keys = {
   },
 }
 
+-- Save native tabs through the official mux API; private state stays local.
+dofile(wezterm.config_dir .. '/native-tabs.lua').setup(config, {
+  state_path = 'D:/terminal-workbench/data/native-tabs.json',
+  helper_path = 'D:/terminal-workbench/Start-NativeTab.ps1',
+})
+
 -- The window title stays readable instead of displaying the active executable path.
 wezterm.on('format-window-title', function()
   return 'Terminal Workbench'

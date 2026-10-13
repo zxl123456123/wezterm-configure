@@ -2,6 +2,8 @@
 powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process -Filter 'Name=''wezterm-gui.exe''' | Where-Object { $_.CommandLine -like '*terminal-workbench*wezterm.lua*' -and $_.CommandLine -like '*attach workbench-v4*' } | Select-Object -First 1; if($p){exit 0}else{exit 1}"
 if not errorlevel 1 (
   powershell -NoProfile -Command "$p=Get-CimInstance Win32_Process -Filter 'Name=''wezterm-gui.exe''' | Where-Object { $_.CommandLine -like '*terminal-workbench*wezterm.lua*' -and $_.CommandLine -like '*attach workbench-v4*' } | Select-Object -First 1; if($p){(New-Object -ComObject WScript.Shell).AppActivate($p.ProcessId) | Out-Null}"
+  powershell -NoProfile -ExecutionPolicy Bypass -File "D:\terminal-workbench\Start-NativeTab.ps1" -CheckWorkbenchSnapshot
+  if not errorlevel 1 exit /b 0
   powershell -NoProfile -ExecutionPolicy Bypass -File "D:\terminal-workbench\Ensure-WorkbenchTabs.ps1" >> "D:\terminal-workbench\data\startup.log" 2>&1
   if errorlevel 1 goto startup_failed
   exit /b 0
@@ -14,6 +16,8 @@ set "CNMPLAYER_ASSET_DIR=D:\terminal-workbench\data\cnmplayer"
 set "PATH=D:\terminal-workbench\apps\chafa\chafa-1.18.3-1-x86_64-win;D:\terminal-workbench\apps\zellij;D:\terminal-workbench\apps\yazi\yazi-x86_64-pc-windows-msvc;D:\terminal-workbench\apps\fastfetch;D:\terminal-workbench\apps\zoxide;D:\terminal-workbench\apps\fzf;D:\terminal-workbench\apps\bottom;%PATH%"
 start "" "D:\terminal-workbench\apps\wezterm\wezterm-gui.exe" --config-file "D:\terminal-workbench\config\wezterm\wezterm.lua" start --always-new-process --cwd "D:\workspace-for-everything" -- "D:\terminal-workbench\apps\zellij\zellij.exe" attach workbench-v4 --create --force-run-commands
 powershell -NoProfile -Command "Start-Sleep -Seconds 3"
+powershell -NoProfile -ExecutionPolicy Bypass -File "D:\terminal-workbench\Start-NativeTab.ps1" -CheckWorkbenchSnapshot
+if not errorlevel 1 exit /b 0
 powershell -NoProfile -ExecutionPolicy Bypass -File "D:\terminal-workbench\Ensure-WorkbenchTabs.ps1" >> "D:\terminal-workbench\data\startup.log" 2>&1
 if errorlevel 1 goto startup_failed
 exit /b 0
