@@ -36,6 +36,7 @@ try {
         -not (Test-Path -LiteralPath $Cwd -PathType Container)) { throw 'Native tab directory is unavailable.' }
     if ($Kind -eq 'grok' -or $Kind -eq 'shell') { . 'D:\terminal-workbench\Start-WorkShell.ps1' }
     Set-Location -LiteralPath $Cwd
+    [Console]::Write(([string][char]27 + ']7;' + ([uri]($Cwd + '\')).AbsoluteUri + [char]7))
     $program = switch ($Kind) {
         'workbench' { 'D:\terminal-workbench\apps\zellij\zellij.exe' }
         'yazi' { 'D:\terminal-workbench\apps\yazi\yazi-x86_64-pc-windows-msvc\yazi.exe' }
@@ -46,7 +47,7 @@ try {
     Set-NativeTabStatus 'ready'
     switch ($Kind) {
         'workbench' { & $program attach workbench-v4 --create --force-run-commands }
-        'grok' { Remove-Item Env:ZELLIJ, Env:ZELLIJ_SESSION_NAME -ErrorAction SilentlyContinue; & $program --continue }
+        'grok' { Remove-Item Env:ZELLIJ, Env:ZELLIJ_SESSION_NAME -ErrorAction SilentlyContinue; & grok --continue }
         'yazi' {
             $env:YAZI_CONFIG_HOME = 'D:\terminal-workbench\config\yazi'
             $env:YAZI_FILE_ONE = 'C:\Program Files\Git\usr\bin\file.exe'

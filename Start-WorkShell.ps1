@@ -77,9 +77,32 @@ if (Get-Module -Name PSReadLine) {
 # On-demand AI coding helper; no agent process runs until the user types ai.
 function global:ai { & codex @args }
 
+# Report Grok lifecycle so tab persistence can skip process-tree polling.
+function global:grok {
+    $grokProgram = (Get-Command grok -CommandType Application -ErrorAction Stop).Source
+    $reportTab = [bool]$env:WEZTERM_PANE
+    if ($reportTab) {
+        [Console]::Write(([string][char]27 + ']7;' + ([uri]((Get-Location).ProviderPath + '\')).AbsoluteUri + [char]7))
+        [Console]::Write(([string][char]27 + ']1337;SetUserVar=native_tabs_kind=Z3Jvaw==' + [char]7))
+        [Console]::Write(([string][char]27 + ']1337;SetUserVar=native_tabs_status=cmVhZHk=' + [char]7))
+    }
+    $savedHttpProxy, $savedHttpsProxy = $env:HTTP_PROXY, $env:HTTPS_PROXY
+    # Use the existing local proxy without changing persistent Windows settings.
+    if (-not $env:HTTP_PROXY) { $env:HTTP_PROXY = 'http://127.0.0.1:7897' }
+    if (-not $env:HTTPS_PROXY) { $env:HTTPS_PROXY = 'http://127.0.0.1:7897' }
+    try { & $grokProgram @args }
+    finally {
+        $env:HTTP_PROXY, $env:HTTPS_PROXY = $savedHttpProxy, $savedHttpsProxy
+        if ($reportTab) {
+            [Console]::Write(([string][char]27 + ']1337;SetUserVar=native_tabs_kind=c2hlbGw=' + [char]7))
+        }
+    }
+}
+
 function global:prompt {
     $location = Get-Location
     if ($location.Provider.Name -eq 'FileSystem') {
+        if ($env:WEZTERM_PANE) { [Console]::Write(([string][char]27 + ']7;' + ([uri]($location.ProviderPath + '\')).AbsoluteUri + [char]7)) }
         if ($global:LastSavedWorkbenchCwd -ne $location.ProviderPath) {
             try {
                 [System.IO.File]::WriteAllText($global:WorkbenchCwdFile,

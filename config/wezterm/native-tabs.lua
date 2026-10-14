@@ -181,11 +181,12 @@ function M.setup(config, opts)
         local cwd = url.file_path:gsub('^/(%a:/)', '%1')
         local vars = pane:get_user_vars()
         local identities = state().workbench_panes or {}
-        local kind = identities[tostring(pane:pane_id())] and 'workbench' or ancestor_kind(pane)
+        -- Reported identities avoid expensive Windows process-tree queries.
+        local kind = identities[tostring(pane:pane_id())] and 'workbench'
         if not kind and kinds[vars.native_tabs_kind] and vars.native_tabs_status == 'ready' then
           kind = vars.native_tabs_kind
         end
-        kind = kind or 'shell'
+        kind = kind or ancestor_kind(pane) or 'shell'
         snapshot.tabs[i] = { kind = kind, title = item.tab:get_title(), cwd = cwd }
         if item.is_active then snapshot.active = i end
       end
