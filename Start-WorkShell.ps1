@@ -80,7 +80,7 @@ function global:ai { & codex @args }
 # Report Grok lifecycle so tab persistence can skip process-tree polling.
 function global:grok {
     $grokProgram = (Get-Command grok -CommandType Application -ErrorAction Stop).Source
-    $reportTab = [bool]$env:WEZTERM_PANE
+    $reportTab = [bool]$env:WEZTERM_PANE -and -not $env:ZELLIJ
     if ($reportTab) {
         [Console]::Write(([string][char]27 + ']7;' + ([uri]((Get-Location).ProviderPath + '\')).AbsoluteUri + [char]7))
         [Console]::Write(([string][char]27 + ']1337;SetUserVar=native_tabs_kind=Z3Jvaw==' + [char]7))
@@ -100,6 +100,14 @@ function global:grok {
 }
 
 function global:prompt {
+    # Report only at the first real prompt, after native-tab startup has finished.
+    # Inner Zellij shells must not overwrite the outer workbench identity.
+    if ($env:WEZTERM_PANE -and -not $env:ZELLIJ -and
+        -not $global:WorkbenchNativeTabManaged -and -not $global:WorkbenchNativeShellReported) {
+        [Console]::Write(([string][char]27 + ']1337;SetUserVar=native_tabs_kind=c2hlbGw=' + [char]7))
+        [Console]::Write(([string][char]27 + ']1337;SetUserVar=native_tabs_status=cmVhZHk=' + [char]7))
+        $global:WorkbenchNativeShellReported = $true
+    }
     $location = Get-Location
     if ($location.Provider.Name -eq 'FileSystem') {
         if ($env:WEZTERM_PANE) { [Console]::Write(([string][char]27 + ']7;' + ([uri]($location.ProviderPath + '\')).AbsoluteUri + [char]7)) }

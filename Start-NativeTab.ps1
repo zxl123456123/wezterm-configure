@@ -23,6 +23,8 @@ if ($CheckWorkbenchSnapshot) {
     }
     exit 1
 }
+# This helper owns ready/failed reporting, even if -NoExit opens a prompt on failure.
+$global:WorkbenchNativeTabManaged = $true
 function Set-NativeTabStatus([string]$Status) {
     $encoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Status))
     [Console]::Write(([string][char]27 + ']1337;SetUserVar=native_tabs_status=' + $encoded + [char]7))

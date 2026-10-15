@@ -53,7 +53,8 @@ local function ancestor_kind(pane)
     local name = basename(info.executable):lower()
     if name == 'grok.exe' then kind = 'grok'
     elseif name == 'yazi.exe' and not kind then kind = 'yazi' end
-    if not info.ppid or info.ppid == 0 then break end
+    -- The GUI is the boundary; do not query its entire child process tree.
+    if not info.ppid or info.ppid == 0 or info.ppid == gui_pid then break end
     info = wezterm.procinfo.get_info_for_pid(info.ppid)
   end
   return kind

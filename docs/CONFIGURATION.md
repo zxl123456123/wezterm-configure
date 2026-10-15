@@ -45,6 +45,10 @@ Shell、Control、Spectrum 的源码更新需要新进程加载；WezTerm 外观
 
 ## 本地 Shell 增强
 
+原生标签保存优先使用 Shell/Grok 上报的身份。普通 Shell 只在第一个提示符报告一次，避免每 2 秒遍历 Windows 进程树；Zellij 内层 Shell/Grok 不上报原生标签身份，以免覆盖外层工作台。未上报身份的旧标签仍使用进程查询，但遇到 WezTerm 父进程就停止，不读取 GUI 的整棵子进程树。身份上报使用 [WezTerm user vars](https://wezterm.org/config/lua/pane/get_user_vars.html)；[官方进程查询文档](https://wezterm.org/config/lua/pane/get_foreground_process_info.html)也明确提示频繁查询有性能开销。选择减少查询而非延长自动保存周期，以保留恢复时效。
+
+恢复启动器通过进程内 managed 标记接管自己的 ready/failed 状态；它启动的 Shell 提示符不再上报身份，避免 PowerShell `-NoExit` 在失败后进入提示符时覆盖 failed。Shell 脚本更新在新开的 Shell 中生效；旧 Shell 可在空提示符下重新加载 `Start-WorkShell.ps1`。Lua 更新重载后，旧标签即可使用提前停止进程遍历的优化。直接输入 `grok.exe` 会绕过 `grok` 包装函数的身份切换；受支持的 Grok 入口是 `grok` 或工作台启动器。
+
 入口：`Start-WorkShell.ps1`。保持 PowerShell 5.1 + PSReadLine 2.0.0、简洁 WIN 提示符与按目录变化保存 cwd；不改全局 profile，不升级模块，也不增加常驻 AI 或动画。
 
 采用 [PSReadLine 原生键位](https://learn.microsoft.com/en-us/powershell/module/psreadline/set-psreadlinekeyhandler)：Tab 菜单补全、上下键前缀历史，配色使用 Macchiato RGB 与清晰选区。F2 复用 [fzf](https://github.com/junegunn/fzf) 按需搜索，遵循 [PSFzf 的编辑器集成方式](https://github.com/kelleyma49/PSFzf)，但不安装额外模块：退出原生 UI 后只重绘一次，选择只插入而不执行。

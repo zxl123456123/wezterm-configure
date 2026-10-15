@@ -139,4 +139,50 @@ $missing = Initialize-Fixture 'without-tools' $false
 $output = @(prompt)
 Assert-That ($output.Count -eq 1 -and $output[0] -eq ('WIN ' + (Join-Path $missing 'project') + ' > ')) 'Optional tools absent: basic shell and cwd memory still work'
 Assert-That (@(Get-PSReadLineKeyHandler -Bound | Where-Object Key -eq 'F2').Count -eq 0) 'Optional fzf absent: no F2 binding installed'
+# Capture protocol output without sending escape sequences to the test host.
+$savedPane, $savedZellij, $savedPath = $env:WEZTERM_PANE, $env:ZELLIJ, $env:PATH
+$consoleOut = [Console]::Out
+$capture = New-Object IO.StringWriter
+try {
+    [Console]::SetOut($capture)
+    $global:WorkbenchNativeShellReported = $null
+    $env:WEZTERM_PANE = '0'; $env:ZELLIJ = '0'
+    $null = prompt
+    $nestedOutput = $capture.ToString(); $null = $capture.GetStringBuilder().Clear()
+    $env:ZELLIJ = $null; $env:WEZTERM_PANE = $null
+    $null = prompt
+    $standaloneOutput = $capture.ToString(); $null = $capture.GetStringBuilder().Clear()
+    $env:WEZTERM_PANE = '0'
+    $null = prompt
+    $firstOutput = $capture.ToString(); $null = $capture.GetStringBuilder().Clear()
+    $null = prompt
+    $secondOutput = $capture.ToString(); $null = $capture.GetStringBuilder().Clear()
+    $global:WorkbenchNativeShellReported = $null
+    $global:WorkbenchNativeTabManaged = $true
+    $null = prompt
+    $managedOutput = $capture.ToString(); $null = $capture.GetStringBuilder().Clear()
+    $global:WorkbenchNativeTabManaged = $null
+    # Use a local application stub: lifecycle checks never start real Grok.
+    $stubDir = Join-Path $root 'grok-stub'
+    $null = New-Item -ItemType Directory -Path $stubDir
+    [IO.File]::WriteAllText((Join-Path $stubDir 'grok.cmd'), "@exit /b 7`r`n")
+    $env:PATH = $stubDir + ';' + $env:SystemRoot + '\System32'
+    grok
+    $grokExit = $global:LASTEXITCODE
+    $grokOutput = $capture.ToString(); $null = $capture.GetStringBuilder().Clear()
+    $env:ZELLIJ = '0'
+    grok
+    $nestedGrokOutput = $capture.ToString()
+} finally {
+    [Console]::SetOut($consoleOut)
+    $capture.Dispose()
+    $env:WEZTERM_PANE, $env:ZELLIJ, $env:PATH = $savedPane, $savedZellij, $savedPath
+}
+Assert-That ($nestedOutput -notmatch 'SetUserVar') 'Zellij prompt preserves outer identity'
+Assert-That ($standaloneOutput -notmatch 'SetUserVar') 'Standalone prompt emits no native identity'
+Assert-That ($firstOutput -match 'native_tabs_kind=c2hlbGw=' -and $firstOutput -match 'native_tabs_status=cmVhZHk=') 'First native prompt reports shell ready, including pane zero'
+Assert-That ($secondOutput -notmatch 'SetUserVar') 'Repeated prompts avoid redundant identity events'
+Assert-That ($managedOutput -notmatch 'SetUserVar') 'Managed startup prompt cannot overwrite ready or failed status'
+Assert-That ($grokOutput -match 'native_tabs_kind=Z3Jvaw==' -and $grokOutput -match 'native_tabs_kind=c2hlbGw=' -and $grokExit -eq 7) 'Grok lifecycle returns to shell and preserves failure exit code'
+Assert-That ($nestedGrokOutput -notmatch 'SetUserVar') 'Nested Grok preserves outer workbench identity'
 Write-Output ("RESULT: {0} assertions passed; PowerShell {1}; isolated root {2}" -f $checks, $PSVersionTable.PSVersion, $root)
